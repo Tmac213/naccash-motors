@@ -1,0 +1,726 @@
+"use client";
+
+import { useEffect, useRef, useState } from 'react';
+import { Pencil, Trash2, Plus, X, Save, CarFront, Camera, Upload, Image } from 'lucide-react';
+import { fetchApi } from '@/lib/api';
+import {
+  BRANDS, getModels, getYears,
+  FUEL_TYPES, DRIVETRAINS, TRANSMISSIONS, ENGINE_CAPACITIES,
+  EXTERIOR_COLORS, INTERIOR_COLORS, BODY_TYPES,
+  OWNER_OPTIONS, KEY_OPTIONS, REGIONAL_SPECS,
+  SUNROOF_OPTIONS, LIGHTING_OPTIONS, TECH_FEATURES, getSpecialPackages,
+} from '@/lib/car-data';
+
+const STATUSES = ['Available', 'Reserved', 'Sold Out', 'Hidden'];
+const CONDITIONS = ['New', 'Like New', 'Certified Pre-Owned', 'Used', 'Needs Repair'];
+
+const emptyForm = {
+  // Basic
+  vin: '', brand: '', model: '', trim: '', year: '', price: '', status: 'Available', condition: 'Used',
+  mileage: '', description: '', image: '',
+  // Engine
+  transmission: '', fuelType: '', engineCapacity: '', drivetrain: '',
+  // Aesthetics
+  exteriorColor: '', interiorColor: '', bodyType: '',
+  // Ownership
+  numberOfOwners: '', keys: '', regionalSpecs: '',
+  // Premium
+  sunroof: '', lighting: '',
+  specialPackages: [] as string[],
+  techFeatures: [] as string[],
+  // Financials (Internal)
+  purchaseCost: '', shippingCost: '', customsCost: '', maintenanceCost: '', otherCosts: '', soldPrice: '',
+};
+
+type FormState = typeof emptyForm;
+
+// Reusable select component
+function Select({ label, id, value, onChange, options, placeholder = 'Select...', disabled = false }: {
+  label: string; id: string; value: string;
+  onChange: (v: string) => void; options: string[];
+  placeholder?: string; disabled?: boolean;
+}) {
+  const allOptions = value && !options.includes(value) ? [value, ...options] : options;
+  
+  return (
+    <div>
+      <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">{label}</label>
+      <select
+        id={id} value={value} disabled={disabled}
+        onChange={e => onChange(e.target.value)}
+        className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-gold transition-colors disabled:opacity-40 appearance-none"
+      >
+        <option value="">{placeholder}</option>
+        {allOptions.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+// Section wrapper
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="border border-white/10 rounded-xl overflow-hidden">
+      <div className="bg-white/5 px-5 py-3 border-b border-white/10">
+        <h3 className="text-sm font-bold uppercase tracking-widest text-gold">{title}</h3>
+      </div>
+      <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>
+    </div>
+  );
+}
+
+// Multi-checkbox selector
+function CheckboxGroup({ label, options, selected, onChange }: {
+  label: string; options: string[]; selected: string[]; onChange: (v: string[]) => void;
+}) {
+  const toggle = (opt: string) => {
+    const current = selected || [];
+    onChange(current.includes(opt) ? current.filter(s => s !== opt) : [...current, opt]);
+  };
+  return (
+    <div className="sm:col-span-2">
+      <label className="block text-xs uppercase tracking-wider text-gray-400 mb-3">{label}</label>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {options.map(opt => (
+          <label key={opt} className="flex items-center gap-3 cursor-pointer group" onClick={(e) => { e.preventDefault(); toggle(opt); }}>
+            <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${selected?.includes(opt) ? 'bg-gold border-gold' : 'border-white/30 group-hover:border-gold/60'}`}>
+              {selected?.includes(opt) && <span className="text-black text-xs font-bold">✓</span>}
+            </div>
+            <span className="text-sm text-gray-300 group-hover:text-white transition-colors">{opt}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function AdminVehiclesPage() {
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [form, setForm] = useState<FormState>(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [decodingVin, setDecodingVin] = useState(false);
+  const [nhtsaTrims, setNhtsaTrims] = useState<string[]>([]);
+  const [loadingTrims, setLoadingTrims] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  const set = (key: keyof FormState) => (value: any) => setForm(prev => ({ ...prev, [key]: value }));
+
+  const models = form.brand ? getModels(form.brand) : [];
+  const years = form.brand ? getYears(form.brand).map(String) : Array.from({ length: 2026 - 1990 + 1 }, (_, i) => String(2026 - i));
+  const packages = form.brand ? getSpecialPackages(form.brand) : [];
+
+  async function loadVehicles() {
+    try {
+      const data = await fetchApi('/inventory/admin');
+      setVehicles(data);
+    } catch (err) {
+      console.error('Failed to load vehicles:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { loadVehicles(); }, []);
+
+  useEffect(() => {
+    async function loadTrims() {
+      if (!form.brand || !form.year) {
+        setNhtsaTrims([]);
+        return;
+      }
+      setLoadingTrims(true);
+      try {
+        const data = await fetchApi(`/nhtsa/models/${encodeURIComponent(form.brand)}/${form.year}`);
+        if (data && data.Results) {
+          const uniqueTrims = Array.from(new Set(data.Results.map((r: any) => r.Model_Name as string))).sort() as string[];
+          setNhtsaTrims(uniqueTrims);
+        }
+      } catch (err) {
+        console.error('Failed to load trims from NHTSA:', err);
+      } finally {
+        setLoadingTrims(false);
+      }
+    }
+    loadTrims();
+  }, [form.brand, form.year]);
+
+  const handleVinDecode = async () => {
+    if (!form.vin || form.vin.length < 11) return alert('Please enter a valid VIN (at least 11 characters)');
+    setDecodingVin(true);
+    try {
+      const res = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${form.vin}?format=json`);
+      const data = await res.json();
+      if (data && data.Results) {
+        const getVal = (variable: string) => {
+          const item = data.Results.find((r: any) => r.Variable === variable && r.Value && r.Value !== 'Not Applicable');
+          return item ? item.Value : null;
+        };
+        
+        const errorCode = getVal('Error Code');
+        const errorText = getVal('Error Text');
+
+        if (errorCode && errorCode !== '0') {
+          alert(`NHTSA Registry Warning: ${errorText || 'This VIN contains errors or is not fully registered in the US database.'} Only partial information could be retrieved.`);
+        }
+
+        const make = getVal('Make');
+        const model = getVal('Model');
+        const year = getVal('Model Year');
+        const trim = getVal('Trim');
+        const displacement = getVal('Displacement (L)');
+        const drive = getVal('Drive Type');
+        const fuel = getVal('Fuel Type - Primary');
+        const body = getVal('Body Class');
+        const trans = getVal('Transmission Style');
+
+        const updates: any = {};
+        if (make) {
+          // Try to match brand (e.g. BMW)
+          const matchedBrand = BRANDS.find(b => b.toUpperCase() === make.toUpperCase());
+          if (matchedBrand) updates.brand = matchedBrand;
+          else updates.brand = make;
+        }
+        if (model) updates.model = model;
+        if (year) updates.year = year;
+        if (trim) updates.trim = trim;
+        if (displacement) {
+          // E.g., 3.0 -> 3.0L
+          const matchedCap = ENGINE_CAPACITIES.find(c => c.startsWith(parseFloat(displacement).toFixed(1)));
+          if (matchedCap) updates.engineCapacity = matchedCap;
+          else updates.engineCapacity = `${parseFloat(displacement).toFixed(1)}L`;
+        }
+        if (fuel) {
+          if (fuel.includes('Gasoline')) updates.fuelType = 'Gasoline (Benzine)';
+          else if (fuel.includes('Diesel')) updates.fuelType = 'Diesel';
+          else if (fuel.includes('Electric')) updates.fuelType = 'Electric (EV)';
+        }
+        if (drive) {
+          if (drive.includes('AWD') || drive.includes('All-Wheel')) updates.drivetrain = 'All-Wheel Drive (AWD)';
+          else if (drive.includes('RWD') || drive.includes('Rear')) updates.drivetrain = 'Rear-Wheel Drive (RWD)';
+          else if (drive.includes('FWD') || drive.includes('Front')) updates.drivetrain = 'Front-Wheel Drive (FWD)';
+          else if (drive.includes('4x4')) updates.drivetrain = '4x4 / 4WD';
+        }
+        if (body) {
+          if (body.includes('Sedan')) updates.bodyType = 'Sedan';
+          else if (body.includes('Coupe')) updates.bodyType = 'Coupe';
+          else if (body.includes('Utility') || body.includes('SUV')) updates.bodyType = 'SUV';
+          else if (body.includes('Convertible')) updates.bodyType = 'Convertible / Cabriolet';
+          else if (body.includes('Hatchback')) updates.bodyType = 'Hatchback';
+          else if (body.includes('Wagon')) updates.bodyType = 'Wagon';
+        }
+        if (trans) {
+          if (trans.includes('Automatic')) updates.transmission = 'Automatic';
+          else if (trans.includes('Manual')) updates.transmission = 'Manual';
+          else if (trans.includes('Continuously Variable') || trans.includes('CVT')) updates.transmission = 'CVT';
+          else if (trans.includes('Dual Clutch') || trans.includes('DCT')) updates.transmission = 'Dual-Clutch (DCT)';
+          else updates.transmission = trans;
+        }
+
+        setForm(prev => ({ ...prev, ...updates }));
+      }
+    } catch (err) {
+      console.error('VIN Decode Failed', err);
+      alert('Failed to fetch data for this VIN.');
+    } finally {
+      setDecodingVin(false);
+    }
+  };
+
+  const handleImageFile = async (file: File) => {
+    if (!file) return;
+    setImageUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      const token = localStorage.getItem('token');
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (!res.ok) throw new Error('Upload failed');
+      const data = await res.json();
+      const finalUrl = data.url.startsWith('http') ? data.url : `${API_URL}${data.url}`;
+      set('image')(finalUrl);
+    } catch (err) {
+      console.error('Upload error:', err);
+      // Fallback: convert to base64
+      const reader = new FileReader();
+      reader.onload = e => set('image')(e.target?.result as string);
+      reader.readAsDataURL(file);
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const openAddForm = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+    setFormError(null);
+    setShowForm(true);
+  };
+
+  const openEditForm = (v: any) => {
+    setEditingId(v.id);
+    setForm({
+      vin: v.vin || '', brand: v.brand || '', model: v.model || '', trim: v.trim || '', year: String(v.year || ''),
+      price: v.price || '', status: v.status || 'Available', condition: v.condition || 'Used',
+      mileage: v.mileage || '', description: v.description || '', image: v.image || '',
+      transmission: v.transmission || '', fuelType: v.fuelType || '',
+      engineCapacity: v.engineCapacity || '', drivetrain: v.drivetrain || '',
+      exteriorColor: v.exteriorColor || '', interiorColor: v.interiorColor || '',
+      bodyType: v.bodyType || '', numberOfOwners: v.numberOfOwners || '',
+      keys: v.keys || '', regionalSpecs: v.regionalSpecs || '',
+      sunroof: v.sunroof || '', lighting: v.lighting || '',
+      specialPackages: v.specialPackages ? JSON.parse(v.specialPackages) : [],
+      techFeatures: v.techFeatures ? JSON.parse(v.techFeatures) : [],
+      purchaseCost: v.purchaseCost || '', shippingCost: v.shippingCost || '',
+      customsCost: v.customsCost || '', maintenanceCost: v.maintenanceCost || '',
+      otherCosts: v.otherCosts || '', soldPrice: v.soldPrice || '',
+    });
+    setFormError(null);
+    setShowForm(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setFormError(null);
+    try {
+      const payload = {
+        ...form,
+        specialPackages: JSON.stringify(form.specialPackages),
+        techFeatures: JSON.stringify(form.techFeatures),
+      };
+      if (editingId !== null) {
+        await fetchApi(`/inventory/${editingId}`, { method: 'PUT', body: JSON.stringify(payload) });
+      } else {
+        await fetchApi('/inventory', { method: 'POST', body: JSON.stringify(payload) });
+      }
+      setShowForm(false);
+      await loadVehicles();
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to save vehicle.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Delete this vehicle permanently?')) return;
+    setDeleting(id);
+    try {
+      await fetchApi(`/inventory/${id}`, { method: 'DELETE' });
+      await loadVehicles();
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex justify-between items-start mb-10">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Vehicles</h1>
+          <p className="text-gray-500 mt-1">Manage your showroom inventory</p>
+        </div>
+        <button onClick={openAddForm}
+          className="bg-gold text-black font-bold px-5 py-2.5 rounded-lg hover:bg-gold-hover transition-colors flex items-center gap-2 uppercase tracking-wider text-sm">
+          <Plus className="w-4 h-4" /> Add Vehicle
+        </button>
+      </div>
+
+      {/* Vehicle Table */}
+      <div className="bg-dark-card border border-white/10 rounded-xl overflow-hidden">
+        {loading ? (
+          <div className="p-12 flex justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold"></div>
+          </div>
+        ) : vehicles.length === 0 ? (
+          <div className="p-12 text-center">
+            <CarFront className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+            <p className="text-gray-500 mb-4">No vehicles yet.</p>
+            <button onClick={openAddForm} className="text-gold hover:text-white transition-colors">Add your first vehicle →</button>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-white/10">
+                {['Vehicle', 'Year', 'Price', 'Fuel', 'Status', ''].map(h => (
+                  <th key={h} className={`text-left text-xs uppercase tracking-wider text-gray-500 px-5 py-4 ${h === 'Year' || h === 'Fuel' ? 'hidden lg:table-cell' : ''}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {vehicles.map(v => (
+                <tr key={v.id} className="hover:bg-white/5 transition-colors group">
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      {v.image ? (
+                        <img src={v.image} alt="" className="w-12 h-10 rounded-md object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-12 h-10 rounded-md bg-white/5 flex items-center justify-center flex-shrink-0">
+                          <CarFront className="w-4 h-4 text-gray-600" />
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-white font-semibold text-sm">{v.brand}</p>
+                        <p className="text-gray-500 text-xs">{v.model}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3 text-gray-400 text-sm hidden lg:table-cell">{v.year}</td>
+                  <td className="px-5 py-3 text-white font-semibold text-sm">{v.price ? `$${Number(v.price).toLocaleString()}` : 'POA'}</td>
+                  <td className="px-5 py-3 text-gray-400 text-xs hidden lg:table-cell">{v.fuelType || '—'}</td>
+                  <td className="px-5 py-3">
+                    <span className={`text-xs font-bold uppercase px-2.5 py-1 rounded-full ${
+                      v.status === 'Available' ? 'bg-green-900/50 text-green-400' :
+                      v.status === 'Reserved' ? 'bg-yellow-900/50 text-yellow-400' :
+                      v.status === 'Sold Out' ? 'bg-red-900/50 text-red-400' : 'bg-gray-800 text-gray-400'
+                    }`}>{v.status}</span>
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => openEditForm(v)}
+                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-gold hover:text-black text-gray-400 flex items-center justify-center transition-colors">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => handleDelete(v.id)} disabled={deleting === v.id}
+                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-red-500 text-gray-400 hover:text-white flex items-center justify-center transition-colors disabled:opacity-50">
+                        {deleting === v.id
+                          ? <span className="animate-spin rounded-full h-3 w-3 border-t-2 border-white"></span>
+                          : <Trash2 className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* ======== FORM MODAL ======== */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+          <div className="bg-[#111] border border-white/15 rounded-2xl w-full max-w-3xl shadow-2xl my-6">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 sticky top-0 bg-[#111] rounded-t-2xl z-10">
+              <div>
+                <h2 className="text-xl font-bold text-white">{editingId ? 'Edit Vehicle' : 'Add New Vehicle'}</h2>
+                <p className="text-gray-500 text-sm mt-0.5">Fill in all available details for best results</p>
+              </div>
+              <button onClick={() => setShowForm(false)} className="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="p-6 md:p-8 space-y-12">
+
+            {/* 🔥 VIN DECODER SECTION */}
+            <div className="bg-gold/10 border border-gold/30 rounded-xl p-6">
+              <h3 className="text-gold font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
+                <CarFront className="w-5 h-5" /> Auto-Fill Specs via VIN
+              </h3>
+              <div className="flex gap-4">
+                <input 
+                  type="text" 
+                  value={form.vin} 
+                  onChange={e => set('vin')(e.target.value.toUpperCase())}
+                  placeholder="Enter 17-digit Vehicle Identification Number (VIN)"
+                  className="flex-1 bg-black/50 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-gold uppercase tracking-widest font-mono"
+                />
+                <button 
+                  type="button" 
+                  onClick={handleVinDecode}
+                  disabled={decodingVin}
+                  className="bg-gold text-black px-6 py-3 rounded-lg font-bold uppercase tracking-wider hover:bg-white transition-colors disabled:opacity-50 whitespace-nowrap"
+                >
+                  {decodingVin ? 'Decoding...' : 'Decode & Fill'}
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-3">
+                Entering a VIN will automatically fetch the exact Brand, Model, Year, Engine, Drivetrain, and Body Type from the NHTSA registry.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-8">
+              {formError && (
+                <div className="bg-red-900/30 border border-red-500/50 text-red-400 rounded-lg px-4 py-3 text-sm">{formError}</div>
+              )}
+
+              {/* ─── BASIC INFO ─── */}
+              <Section title="Basic Information">
+                {/* Brand */}
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Brand *</label>
+                  <select required id="brand" value={form.brand}
+                    onChange={e => setForm(prev => ({ ...prev, brand: e.target.value, model: '', year: '', transmission: '' }))}
+                    className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-gold transition-colors">
+                    <option value="">Select brand...</option>
+                    {(form.brand && !BRANDS.includes(form.brand) ? [form.brand, ...BRANDS] : BRANDS).map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+
+                {/* Model */}
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Model *</label>
+                  <select required id="model" value={form.model}
+                    disabled={!form.brand}
+                    onChange={e => setForm(prev => ({ ...prev, model: e.target.value, year: '' }))}
+                    className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-gold transition-colors disabled:opacity-40">
+                    <option value="">{form.brand ? 'Select model...' : 'Select brand first'}</option>
+                    {(form.model && !models.includes(form.model) ? [form.model, ...models] : models).map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+
+                {/* Trim / Exact Model */}
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">
+                    Trim / Exact Model {loadingTrims && <span className="text-gold lowercase ml-2 animate-pulse">loading...</span>}
+                  </label>
+                  <input type="text" id="trim" value={form.trim} onChange={e => set('trim')(e.target.value)}
+                    list="trim-options"
+                    className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-gold"
+                    placeholder="e.g. 530i, M Sport..." />
+                  <datalist id="trim-options">
+                    {nhtsaTrims.map(t => <option key={t} value={t} />)}
+                  </datalist>
+                  <p className="text-xs text-gray-500 mt-1">Select from dropdown or type custom trim</p>
+                </div>
+
+                {/* Year */}
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Year *</label>
+                  <select required id="year" value={form.year}
+                    disabled={!form.model}
+                    onChange={e => set('year')(e.target.value)}
+                    className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-gold transition-colors disabled:opacity-40">
+                    <option value="">{form.model ? 'Select year...' : 'Select model first'}</option>
+                    {years.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+
+                {/* Price */}
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Price (USD)</label>
+                  <input type="number" min="0" id="price" value={form.price} onChange={e => set('price')(e.target.value)}
+                    className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-gold"
+                    placeholder="e.g. 215000" />
+                </div>
+
+                <Select label="Status" id="status" value={form.status} onChange={set('status')} options={STATUSES} />
+                <Select label="Condition" id="condition" value={form.condition} onChange={set('condition')} options={CONDITIONS} />
+
+                {/* Mileage */}
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Mileage (km)</label>
+                  <input type="number" min="0" id="mileage" value={form.mileage} onChange={e => set('mileage')(e.target.value)}
+                    className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-gold"
+                    placeholder="e.g. 12000" />
+                </div>
+
+                <Select label="Body Type" id="bodyType" value={form.bodyType} onChange={set('bodyType')} options={BODY_TYPES} />
+              </Section>
+
+              {/* ─── IMAGE ─── */}
+              <div className="border border-white/10 rounded-xl overflow-hidden">
+                <div className="bg-white/5 px-5 py-3 border-b border-white/10">
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-gold">Vehicle Image</h3>
+                </div>
+                <div className="p-5 space-y-4">
+                  {/* Image preview */}
+                  {form.image && (
+                    <div className="relative h-48 rounded-lg overflow-hidden bg-black/30">
+                      <img src={form.image} alt="Preview" className="w-full h-full object-cover"
+                        onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                      <button type="button" onClick={() => set('image')('')}
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-red-600 text-white flex items-center justify-center transition-colors">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                  {/* Upload buttons */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {/* Gallery */}
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile(f); e.target.value = ''; }} />
+                    <button type="button" onClick={() => fileInputRef.current?.click()} disabled={imageUploading}
+                      className="flex-1 flex items-center justify-center gap-2 border border-white/20 hover:border-gold text-gray-400 hover:text-white rounded-lg py-3 transition-colors">
+                      <Image className="w-4 h-4" />
+                      {imageUploading ? 'Uploading...' : 'Browse Gallery'}
+                    </button>
+                    {/* Camera */}
+                    <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile(f); e.target.value = ''; }} />
+                    <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={imageUploading}
+                      className="flex-1 flex items-center justify-center gap-2 border border-white/20 hover:border-gold text-gray-400 hover:text-white rounded-lg py-3 transition-colors">
+                      <Camera className="w-4 h-4" /> Take Photo
+                    </button>
+                  </div>
+                  {/* URL fallback */}
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Or paste image URL</label>
+                    <div className="flex gap-2">
+                      <input type="url" id="imageUrl" value={form.image.startsWith('http') && !form.image.startsWith('http://localhost') ? form.image : ''}
+                        onChange={e => set('image')(e.target.value)}
+                        className="flex-1 bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-gold"
+                        placeholder="https://..." />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ─── ENGINE & PERFORMANCE ─── */}
+              <Section title="Engine & Performance">
+                <Select label="Transmission" id="transmission" value={form.transmission} onChange={set('transmission')} options={TRANSMISSIONS} />
+                <Select label="Fuel Type" id="fuelType" value={form.fuelType} onChange={set('fuelType')} options={FUEL_TYPES} />
+                <Select label="Engine Capacity" id="engineCapacity" value={form.engineCapacity} onChange={set('engineCapacity')} options={ENGINE_CAPACITIES} />
+                <Select label="Drivetrain" id="drivetrain" value={form.drivetrain} onChange={set('drivetrain')} options={DRIVETRAINS} />
+              </Section>
+
+              {/* ─── AESTHETICS ─── */}
+              <Section title="Aesthetics & Styling">
+                <Select label="Exterior Color" id="exteriorColor" value={form.exteriorColor} onChange={set('exteriorColor')} options={EXTERIOR_COLORS} />
+                <Select label="Interior Color & Material" id="interiorColor" value={form.interiorColor} onChange={set('interiorColor')} options={INTERIOR_COLORS} />
+              </Section>
+
+              {/* ─── OWNERSHIP ─── */}
+              <Section title="Ownership & Legal Status">
+                <Select label="Number of Owners" id="numberOfOwners" value={form.numberOfOwners} onChange={set('numberOfOwners')} options={OWNER_OPTIONS} />
+                <Select label="Keys" id="keys" value={form.keys} onChange={set('keys')} options={KEY_OPTIONS} />
+                <Select label="Regional Specs (Origin)" id="regionalSpecs" value={form.regionalSpecs} onChange={set('regionalSpecs')} options={REGIONAL_SPECS} />
+              </Section>
+
+              {/* ─── PREMIUM FEATURES ─── */}
+              <Section title="Premium Features & Packages">
+                <Select label="Sunroof / Roof" id="sunroof" value={form.sunroof} onChange={set('sunroof')} options={SUNROOF_OPTIONS} />
+                <Select label="Lighting" id="lighting" value={form.lighting} onChange={set('lighting')} options={LIGHTING_OPTIONS} />
+
+                {/* Special Packages — brand-specific checkboxes */}
+                {packages.length > 0 && (
+                  <CheckboxGroup label="Special Packages" options={packages}
+                    selected={form.specialPackages} onChange={set('specialPackages')} />
+                )}
+
+                {/* Tech Features */}
+                <CheckboxGroup label="Tech Features" options={TECH_FEATURES}
+                  selected={form.techFeatures} onChange={set('techFeatures')} />
+              </Section>
+
+              {/* ─── DESCRIPTION ─── */}
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Description</label>
+                <textarea id="description" value={form.description} onChange={e => set('description')(e.target.value)} rows={4}
+                  className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-gold resize-none"
+                  placeholder="Describe the vehicle, notable features, history, condition..." />
+              </div>
+
+              {/* ─── INTERNAL FINANCIALS ─── */}
+              <div className="border border-red-500/30 rounded-xl overflow-hidden mt-8">
+                <div className="bg-red-500/10 px-5 py-3 border-b border-red-500/30 flex items-center justify-between">
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-red-500">Internal Accounting & Financials (Private)</h3>
+                </div>
+                <div className="p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Purchase Cost ($)</label>
+                    <input type="number" value={form.purchaseCost || ''} onChange={e => set('purchaseCost')(e.target.value)}
+                      className="w-full bg-black/50 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Shipping Cost ($)</label>
+                    <input type="number" value={form.shippingCost || ''} onChange={e => set('shippingCost')(e.target.value)}
+                      className="w-full bg-black/50 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Customs & Taxes ($)</label>
+                    <input type="number" value={form.customsCost || ''} onChange={e => set('customsCost')(e.target.value)}
+                      className="w-full bg-black/50 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Maintenance / Prep ($)</label>
+                    <input type="number" value={form.maintenanceCost || ''} onChange={e => set('maintenanceCost')(e.target.value)}
+                      className="w-full bg-black/50 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Other Costs ($)</label>
+                    <input type="number" value={form.otherCosts || ''} onChange={e => set('otherCosts')(e.target.value)}
+                      className="w-full bg-black/50 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-500" />
+                  </div>
+                  {form.status === 'Sold Out' && (
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-gold mb-2">Final Sale Price ($)</label>
+                      <input type="number" value={form.soldPrice || ''} onChange={e => set('soldPrice')(e.target.value)}
+                        className="w-full bg-black/50 border border-gold text-white rounded-lg px-4 py-3 focus:outline-none focus:border-gold" />
+                    </div>
+                  )}
+
+                  <div className="md:col-span-3 mt-4 bg-black/40 p-4 rounded-lg border border-white/5 flex flex-wrap gap-6 justify-between items-center">
+                    {(() => {
+                      const totalCost = (Number(form.purchaseCost) || 0) + (Number(form.shippingCost) || 0) + (Number(form.customsCost) || 0) + (Number(form.maintenanceCost) || 0) + (Number(form.otherCosts) || 0);
+                      const askingPrice = Number(form.price) || 0;
+                      const isSold = form.status === 'Sold Out';
+                      const revenue = isSold ? (Number(form.soldPrice) || 0) : askingPrice;
+                      const profit = revenue - totalCost;
+                      const margin = totalCost > 0 ? (profit / totalCost) * 100 : 0;
+                      
+                      return (
+                        <>
+                          <div>
+                            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Total Cost</p>
+                            <p className="text-xl font-mono text-white">${totalCost.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">{isSold ? 'Final Revenue' : 'Asking Price'}</p>
+                            <p className="text-xl font-mono text-white">${revenue.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">{isSold ? 'Actual Profit' : 'Expected Profit'}</p>
+                            <p className={`text-xl font-mono ${profit >= 0 ? 'text-green-400' : 'text-red-500'}`}>
+                              {profit >= 0 ? '+' : '-'}${Math.abs(profit).toLocaleString()}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Margin</p>
+                            <p className={`text-xl font-mono ${margin >= 0 ? 'text-green-400' : 'text-red-500'}`}>
+                              {margin.toFixed(1)}%
+                            </p>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+              {/* ─── ACTIONS ─── */}
+              <div className="flex gap-3 pt-2 sticky bottom-0 bg-[#111] pb-2">
+                <button type="button" onClick={() => setShowForm(false)}
+                  className="flex-1 border border-white/20 text-gray-400 hover:text-white hover:border-white/40 py-3 rounded-lg transition-colors font-medium">
+                  Cancel
+                </button>
+                <button type="submit" disabled={saving}
+                  className="flex-1 bg-gold text-black font-bold py-3 rounded-lg hover:bg-gold-hover transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                  {saving
+                    ? <span className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-black"></span>
+                    : <Save className="w-4 h-4" />}
+                  {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Add Vehicle'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
