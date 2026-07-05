@@ -11,7 +11,7 @@ import {
   SUNROOF_OPTIONS, LIGHTING_OPTIONS, TECH_FEATURES, getSpecialPackages,
 } from '@/lib/car-data';
 
-const STATUSES = ['Available', 'Reserved', 'Sold Out', 'Hidden'];
+const STATUSES = ['Available', 'Reserved', 'Sold Out', 'Hidden', 'Coming Soon'];
 const CONDITIONS = ['New', 'Like New', 'Certified Pre-Owned', 'Used', 'Needs Repair'];
 
 const emptyForm = {
@@ -385,11 +385,12 @@ export default function AdminVehiclesPage() {
                     <span className={`text-xs font-bold uppercase px-2.5 py-1 rounded-full ${
                       v.status === 'Available' ? 'bg-green-900/50 text-green-400' :
                       v.status === 'Reserved' ? 'bg-yellow-900/50 text-yellow-400' :
-                      v.status === 'Sold Out' ? 'bg-red-900/50 text-red-400' : 'bg-gray-800 text-gray-400'
+                      v.status === 'Sold Out' ? 'bg-red-900/50 text-red-400' : 
+                      v.status === 'Coming Soon' ? 'bg-purple-900/50 text-purple-400' : 'bg-gray-800 text-gray-400'
                     }`}>{v.status}</span>
                   </td>
                   <td className="px-5 py-3">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center justify-end gap-2">
                       <button onClick={() => openEditForm(v)}
                         className="w-8 h-8 rounded-lg bg-white/5 hover:bg-gold hover:text-black text-gray-400 flex items-center justify-center transition-colors">
                         <Pencil className="w-3.5 h-3.5" />

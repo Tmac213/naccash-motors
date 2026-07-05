@@ -103,12 +103,24 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {latestVehicles.map((car: any) => (
+            {latestVehicles.map((car: any) => {
+              const isNew = new Date().getTime() - new Date(car.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000;
+              return (
               <div key={car.id} className="group bg-dark-card border border-white/10 overflow-hidden hover:border-gold/50 transition-colors">
                 <div className="relative h-64 overflow-hidden">
+                  {isNew && (
+                    <div className="absolute top-4 right-4 z-10 bg-red-600 text-white text-xs font-bold uppercase px-3 py-1 rounded-sm shadow">
+                      NEW
+                    </div>
+                  )}
                   {car.status === 'Available' && (
                     <div className="absolute top-4 left-4 z-10 bg-gold text-black text-xs font-bold uppercase px-3 py-1 rounded-sm">
                       Available
+                    </div>
+                  )}
+                  {car.status === 'Coming Soon' && (
+                    <div className="absolute top-4 left-4 z-10 bg-purple-500 text-white text-xs font-bold uppercase px-3 py-1 rounded-sm">
+                      Coming Soon
                     </div>
                   )}
                   <img 
@@ -122,13 +134,13 @@ export default function Home() {
                   <p className="text-gray-400 text-sm mb-4">{car.transmission || 'Auto'} • {car.condition || 'Used'}</p>
                   <div className="flex justify-between items-center mt-6 pt-6 border-t border-white/10">
                     <span className="text-2xl font-bold text-white">${car.price?.toLocaleString() || 'POA'}</span>
-                    <Link href={`/inventory/${car.id}`} className="text-gold uppercase tracking-wider text-sm font-semibold hover:text-white transition-colors">
+                    <Link href={`/inventory?id=${car.id}`} className="text-gold uppercase tracking-wider text-sm font-semibold hover:text-white transition-colors">
                       Details
                     </Link>
                   </div>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </section>

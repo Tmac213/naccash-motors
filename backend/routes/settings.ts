@@ -33,20 +33,28 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 // Update settings (Admin only)
 router.put('/', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const { whatsappNumber, instagramUrl, tiktokUrl } = req.body;
+    const { whatsappNumber, instagramUrl, tiktokUrl, email, phoneNumber, address, aboutUsText } = req.body;
 
     const updatedSettings = await prisma.settings.upsert({
       where: { id: 1 },
       update: {
         whatsappNumber,
         instagramUrl,
-        tiktokUrl
+        tiktokUrl,
+        email,
+        phoneNumber,
+        address,
+        aboutUsText
       },
       create: {
         id: 1,
         whatsappNumber,
         instagramUrl,
-        tiktokUrl
+        tiktokUrl,
+        email,
+        phoneNumber,
+        address,
+        aboutUsText
       }
     });
 

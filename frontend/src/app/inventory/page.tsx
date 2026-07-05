@@ -13,21 +13,26 @@ function CarDetail({ id }: { id: string }) {
   const router = useRouter();
   const [activeImage, setActiveImage] = useState(0);
   const [car, setCar] = useState<any>(null);
+  const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadCar() {
+    async function loadData() {
       try {
-        const data = await fetchApi(`/inventory/${id}`);
-        setCar(data);
+        const [carData, settingsData] = await Promise.all([
+          fetchApi(`/inventory/${id}`),
+          fetchApi('/settings').catch(() => null)
+        ]);
+        setCar(carData);
+        setSettings(settingsData);
       } catch (err: any) {
         setError(err.message || 'Failed to load vehicle');
       } finally {
         setLoading(false);
       }
     }
-    loadCar();
+    loadData();
   }, [id]);
 
   if (loading) {
@@ -117,7 +122,10 @@ function CarDetail({ id }: { id: string }) {
           <div className="space-y-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${car.status === 'Available' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
+                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                  car.status === 'Available' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                  car.status === 'Coming Soon' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
+                  'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
                   {car.status || 'Available'}
                 </span>
                 <span className="text-white/40 text-sm">{car.year}</span>
@@ -171,7 +179,7 @@ function CarDetail({ id }: { id: string }) {
 
             <div className="flex gap-4 pt-2">
               <a
-                href={`https://wa.me/1234567890?text=I'm interested in the ${car.year} ${car.brand} ${car.model}`}
+                href={`https://wa.me/${settings?.whatsappNumber?.replace(/\+/g, '') || '1234567890'}?text=I'm interested in the ${car.year} ${car.brand} ${car.model}`}
                 target="_blank" rel="noopener noreferrer"
                 className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-6 rounded-xl transition-colors duration-200"
               >
@@ -197,6 +205,8 @@ function InventoryList() {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [showFilter, setShowFilter] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('');
 
   useEffect(() => {
     async function loadVehicles() {
@@ -214,11 +224,11 @@ function InventoryList() {
 
   const filtered = vehicles.filter((car: any) => {
     const q = search.toLowerCase();
-    return (
-      car.brand?.toLowerCase().includes(q) ||
-      car.model?.toLowerCase().includes(q) ||
-      String(car.year).includes(q)
-    );
+    const matchesSearch = car.brand?.toLowerCase().includes(q) ||
+                          car.model?.toLowerCase().includes(q) ||
+                          String(car.year).includes(q);
+    const matchesStatus = statusFilter === '' || car.status === statusFilter;
+    return matchesSearch && matchesStatus;
   });
 
   return (
@@ -229,9 +239,28 @@ function InventoryList() {
           <div className="w-24 h-1 bg-gold"></div>
         </div>
         <div className="flex gap-4 w-full md:w-auto">
-          <button className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-dark-card border border-white/20 text-white px-6 py-3 hover:border-gold transition-colors">
-            <Filter className="w-4 h-4" /> Filter
-          </button>
+          <div className="flex flex-col md:flex-none">
+            <button 
+              onClick={() => setShowFilter(!showFilter)}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-dark-card border border-white/20 text-white px-6 py-3 hover:border-gold transition-colors">
+              <Filter className="w-4 h-4" /> Filter
+            </button>
+            {showFilter && (
+              <div className="absolute mt-14 z-20 bg-dark-card border border-white/20 p-4 rounded-lg shadow-xl w-48">
+                <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Status</label>
+                <select 
+                  value={statusFilter} 
+                  onChange={e => setStatusFilter(e.target.value)}
+                  className="w-full bg-dark-bg border border-white/20 text-white rounded px-3 py-2 focus:outline-none focus:border-gold"
+                >
+                  <option value="">All</option>
+                  <option value="Available">Available</option>
+                  <option value="Reserved">Reserved</option>
+                  <option value="Coming Soon">Coming Soon</option>
+                </select>
+              </div>
+            )}
+          </div>
           <div className="relative flex-1 md:w-64">
             <input
               type="text"
@@ -259,6 +288,9 @@ function InventoryList() {
                 )}
                 {car.status === 'Reserved' && (
                   <div className="absolute top-4 left-4 z-10 bg-blue-500 text-white text-xs font-bold uppercase px-3 py-1 rounded-sm shadow-lg">Reserved</div>
+                )}
+                {car.status === 'Coming Soon' && (
+                  <div className="absolute top-4 left-4 z-10 bg-purple-500 text-white text-xs font-bold uppercase px-3 py-1 rounded-sm shadow-lg">Coming Soon</div>
                 )}
                 {car.status === 'Sold Out' && (
                   <div className="absolute inset-0 z-10 bg-black/60 flex items-center justify-center backdrop-blur-sm">

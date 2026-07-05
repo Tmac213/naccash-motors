@@ -9,6 +9,10 @@ export default function AdminSettingsPage() {
     whatsappNumber: '',
     instagramUrl: '',
     tiktokUrl: '',
+    email: '',
+    phoneNumber: '',
+    address: '',
+    aboutUsText: '',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -24,6 +28,10 @@ export default function AdminSettingsPage() {
             whatsappNumber: data.whatsappNumber || '',
             instagramUrl: data.instagramUrl || '',
             tiktokUrl: data.tiktokUrl || '',
+            email: data.email || '',
+            phoneNumber: data.phoneNumber || '',
+            address: data.address || '',
+            aboutUsText: data.aboutUsText || '',
           });
         }
       } catch (err) {
@@ -89,6 +97,44 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
+        {/* Contact Information */}
+        <div className="bg-dark-card border border-white/10 rounded-xl p-6">
+          <h2 className="text-lg font-bold text-white mb-1">Contact Information</h2>
+          <p className="text-gray-500 text-sm mb-5">Main contact details shown on the Contact Us page.</p>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Email Address</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-gold transition-colors"
+                placeholder="contact@showroom.com"
+              />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Phone Number</label>
+              <input
+                type="text"
+                value={form.phoneNumber}
+                onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
+                className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-gold transition-colors"
+                placeholder="+1 (234) 567-8900"
+              />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Physical Address</label>
+              <textarea
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-gold transition-colors resize-none"
+                placeholder="123 Luxury Ave..."
+                rows={3}
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Social Media */}
         <div className="bg-dark-card border border-white/10 rounded-xl p-6">
           <h2 className="text-lg font-bold text-white mb-1">Social Media</h2>
@@ -116,6 +162,22 @@ export default function AdminSettingsPage() {
                 placeholder="https://tiktok.com/@yourpage"
               />
             </div>
+          </div>
+        </div>
+
+        {/* About Us */}
+        <div className="bg-dark-card border border-white/10 rounded-xl p-6">
+          <h2 className="text-lg font-bold text-white mb-1">About Us</h2>
+          <p className="text-gray-500 text-sm mb-5">Content displayed on the About Us page.</p>
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">About Us Text</label>
+            <textarea
+              value={form.aboutUsText}
+              onChange={(e) => setForm({ ...form, aboutUsText: e.target.value })}
+              className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-gold transition-colors resize-none"
+              placeholder="We are a premium car dealership..."
+              rows={6}
+            />
           </div>
         </div>
 

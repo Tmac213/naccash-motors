@@ -63,5 +63,9 @@ model Settings {
   whatsappNumber String?
   instagramUrl   String?
   tiktokUrl      String?
+  email          String?
+  phoneNumber    String?
+  address        String?
+  aboutUsText    String?
   updatedAt      DateTime @updatedAt
 }
