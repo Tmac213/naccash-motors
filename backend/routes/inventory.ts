@@ -114,9 +114,9 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
     const updateData = req.body;
 
     // Convert string to number if needed for certain fields
-    if (updateData.year) updateData.year = parseInt(updateData.year, 10);
-    if (updateData.mileage) updateData.mileage = parseInt(updateData.mileage, 10);
-    if (updateData.price) updateData.price = parseFloat(updateData.price);
+    if (updateData.year !== undefined) updateData.year = updateData.year ? parseInt(updateData.year, 10) : null;
+    if (updateData.mileage !== undefined) updateData.mileage = updateData.mileage ? parseInt(updateData.mileage, 10) : null;
+    if (updateData.price !== undefined) updateData.price = updateData.price ? parseFloat(updateData.price) : null;
     
     if (updateData.purchaseCost !== undefined) updateData.purchaseCost = updateData.purchaseCost ? parseFloat(updateData.purchaseCost) : null;
     if (updateData.shippingCost !== undefined) updateData.shippingCost = updateData.shippingCost ? parseFloat(updateData.shippingCost) : null;
