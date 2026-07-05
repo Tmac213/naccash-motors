@@ -78,8 +78,15 @@ function CarDetail({ id }: { id: string }) {
           {/* Image Gallery */}
           <div className="space-y-4">
             <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-white/5 border border-white/10">
-              {images.length > 0 && (
+              {images.length > 0 ? (
                 <img src={images[activeImage]} alt={`${car.brand} ${car.model}`} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-gray-500">
+                  <div className="w-20 h-20 mb-4 opacity-20 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21 8-2 2-1.5-3.7A2 2 0 0 0 15.64 5H8.4a2 2 0 0 0-1.9 1.3L5 10 3 8"/><path d="M1 11.5 3 10l-1.5-1.5"/><path d="m23 11.5-2-1.5 1.5-1.5"/><path d="M5.5 10h13l1.5 3.5V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3.5L5.5 10z"/><circle cx="7.5" cy="14.5" r="1.5"/><circle cx="16.5" cy="14.5" r="1.5"/></svg>
+                  </div>
+                  <span className="text-sm font-medium uppercase tracking-widest opacity-50">Coming Soon</span>
+                </div>
               )}
               {images.length > 1 && (
                 <>
@@ -134,7 +141,7 @@ function CarDetail({ id }: { id: string }) {
               {car.trim && <p className="text-amber-400 text-lg font-medium">{car.trim}</p>}
             </div>
 
-            <div className="text-4xl font-bold text-amber-400">${car.price?.toLocaleString()}</div>
+            <div className="text-4xl font-bold text-amber-400">{car.price ? `$${car.price.toLocaleString()}` : 'POA'}</div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {[
@@ -297,11 +304,19 @@ function InventoryList() {
                     <span className="border-2 border-red-500 text-red-500 font-bold uppercase tracking-widest px-6 py-2 rotate-[-15deg] text-xl">Sold Out</span>
                   </div>
                 )}
-                <img
-                  src={car.image}
-                  alt={`${car.year} ${car.brand} ${car.model}`}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                />
+                {car.image ? (
+                  <img
+                    src={car.image}
+                    alt={`${car.year} ${car.brand} ${car.model}`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-white/5 text-gray-500">
+                    <div className="w-12 h-12 mb-2 opacity-20 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21 8-2 2-1.5-3.7A2 2 0 0 0 15.64 5H8.4a2 2 0 0 0-1.9 1.3L5 10 3 8"/><path d="M1 11.5 3 10l-1.5-1.5"/><path d="m23 11.5-2-1.5 1.5-1.5"/><path d="M5.5 10h13l1.5 3.5V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3.5L5.5 10z"/><circle cx="7.5" cy="14.5" r="1.5"/><circle cx="16.5" cy="14.5" r="1.5"/></svg>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="p-5 flex-1 flex flex-col">
                 <h2 className="text-xl font-bold text-white mb-1">
@@ -309,7 +324,7 @@ function InventoryList() {
                   {car.trim && <span className="text-gold font-normal text-sm ml-1">{car.trim}</span>}
                 </h2>
                 <div className="mt-auto flex justify-between items-center pt-4 border-t border-white/10">
-                  <span className="text-xl font-bold text-white">${car.price?.toLocaleString()}</span>
+                  <span className="text-xl font-bold text-white">{car.price ? `$${car.price.toLocaleString()}` : 'POA'}</span>
                   <button
                     onClick={() => router.push(`/inventory?id=${car.id}`)}
                     className="text-gold uppercase tracking-wider text-xs font-bold hover:text-white transition-colors"

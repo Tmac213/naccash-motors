@@ -35,18 +35,20 @@ const emptyForm = {
 type FormState = typeof emptyForm;
 
 // Reusable select component
-function Select({ label, id, value, onChange, options, placeholder = 'Select...', disabled = false }: {
+function Select({ label, id, value, onChange, options, placeholder = 'Select...', disabled = false, required = false }: {
   label: string; id: string; value: string;
   onChange: (v: string) => void; options: string[];
-  placeholder?: string; disabled?: boolean;
+  placeholder?: string; disabled?: boolean; required?: boolean;
 }) {
   const allOptions = value && !options.includes(value) ? [value, ...options] : options;
   
   return (
     <div>
-      <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">{label}</label>
+      <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">
+        {label} {required && <span className="text-gold">*</span>}
+      </label>
       <select
-        id={id} value={value} disabled={disabled}
+        id={id} value={value} disabled={disabled} required={required}
         onChange={e => onChange(e.target.value)}
         className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-gold transition-colors disabled:opacity-40 appearance-none"
       >
@@ -426,7 +428,14 @@ export default function AdminVehiclesPage() {
             </div>
 
             <form onSubmit={handleSave} className="p-6 md:p-8 space-y-12">
+            
+            {/* Compute dynamic required fields */}
+            {(() => {
+              const isComingSoon = form.status === 'Coming Soon';
+              const req = !isComingSoon;
 
+              return (
+                <>
             {/* 🔥 VIN DECODER SECTION */}
             <div className="bg-gold/10 border border-gold/30 rounded-xl p-6">
               <h3 className="text-gold font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -513,19 +522,23 @@ export default function AdminVehiclesPage() {
 
                 {/* Price */}
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Price (USD)</label>
-                  <input type="number" min="0" id="price" value={form.price} onChange={e => set('price')(e.target.value)}
+                  <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">
+                    Price (USD) {req && <span className="text-gold">*</span>}
+                  </label>
+                  <input type="number" min="0" id="price" value={form.price} required={req} onChange={e => set('price')(e.target.value)}
                     className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-gold"
                     placeholder="e.g. 215000" />
                 </div>
 
-                <Select label="Status" id="status" value={form.status} onChange={set('status')} options={STATUSES} />
-                <Select label="Condition" id="condition" value={form.condition} onChange={set('condition')} options={CONDITIONS} />
+                <Select label="Status" id="status" value={form.status} onChange={set('status')} options={STATUSES} required={true} />
+                <Select label="Condition" id="condition" value={form.condition} onChange={set('condition')} options={CONDITIONS} required={true} />
 
                 {/* Mileage */}
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Mileage (km)</label>
-                  <input type="number" min="0" id="mileage" value={form.mileage} onChange={e => set('mileage')(e.target.value)}
+                  <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">
+                    Mileage (km) {req && <span className="text-gold">*</span>}
+                  </label>
+                  <input type="number" min="0" id="mileage" value={form.mileage} required={req} onChange={e => set('mileage')(e.target.value)}
                     className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-gold"
                     placeholder="e.g. 12000" />
                 </div>
@@ -535,8 +548,10 @@ export default function AdminVehiclesPage() {
 
               {/* ─── IMAGE ─── */}
               <div className="border border-white/10 rounded-xl overflow-hidden">
-                <div className="bg-white/5 px-5 py-3 border-b border-white/10">
-                  <h3 className="text-sm font-bold uppercase tracking-widest text-gold">Vehicle Image</h3>
+                <div className="bg-white/5 px-5 py-3 border-b border-white/10 flex items-center justify-between">
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-gold">
+                    Vehicle Image {req && <span>*</span>}
+                  </h3>
                 </div>
                 <div className="p-5 space-y-4">
                   {/* Image preview */}
@@ -573,6 +588,7 @@ export default function AdminVehiclesPage() {
                     <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Or paste image URL</label>
                     <div className="flex gap-2">
                       <input type="url" id="imageUrl" value={form.image.startsWith('http') && !form.image.startsWith('http://localhost') ? form.image : ''}
+                        required={req && !form.image}
                         onChange={e => set('image')(e.target.value)}
                         className="flex-1 bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-gold"
                         placeholder="https://..." />
@@ -583,15 +599,15 @@ export default function AdminVehiclesPage() {
 
               {/* ─── ENGINE & PERFORMANCE ─── */}
               <Section title="Engine & Performance">
-                <Select label="Transmission" id="transmission" value={form.transmission} onChange={set('transmission')} options={TRANSMISSIONS} />
-                <Select label="Fuel Type" id="fuelType" value={form.fuelType} onChange={set('fuelType')} options={FUEL_TYPES} />
+                <Select label="Transmission" id="transmission" value={form.transmission} onChange={set('transmission')} options={TRANSMISSIONS} required={req} />
+                <Select label="Fuel Type" id="fuelType" value={form.fuelType} onChange={set('fuelType')} options={FUEL_TYPES} required={req} />
                 <Select label="Engine Capacity" id="engineCapacity" value={form.engineCapacity} onChange={set('engineCapacity')} options={ENGINE_CAPACITIES} />
                 <Select label="Drivetrain" id="drivetrain" value={form.drivetrain} onChange={set('drivetrain')} options={DRIVETRAINS} />
               </Section>
 
               {/* ─── AESTHETICS ─── */}
               <Section title="Aesthetics & Styling">
-                <Select label="Exterior Color" id="exteriorColor" value={form.exteriorColor} onChange={set('exteriorColor')} options={EXTERIOR_COLORS} />
+                <Select label="Exterior Color" id="exteriorColor" value={form.exteriorColor} onChange={set('exteriorColor')} options={EXTERIOR_COLORS} required={req} />
                 <Select label="Interior Color & Material" id="interiorColor" value={form.interiorColor} onChange={set('interiorColor')} options={INTERIOR_COLORS} />
               </Section>
 
@@ -718,6 +734,9 @@ export default function AdminVehiclesPage() {
                   {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Add Vehicle'}
                 </button>
               </div>
+                </>
+              );
+            })()}
             </form>
           </div>
         </div>
