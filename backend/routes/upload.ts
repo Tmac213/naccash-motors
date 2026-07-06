@@ -26,38 +26,18 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Dynamic storage engine
-let storage: multer.StorageEngine;
-
-const useCloudinary = !!(process.env.CLOUDINARY_URL || process.env.CLOUDINARY_CLOUD_NAME);
-
-if (useCloudinary) {
-  storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: async (req, file) => {
-      const isVideo = file.mimetype.startsWith('video/');
-      return {
-        folder: 'car-dealer-uploads',
-        resource_type: isVideo ? 'video' : 'image',
-        allowed_formats: ['jpg', 'png', 'jpeg', 'webp', 'heic', 'mp4', 'mov', 'avi', 'mkv', 'webm'],
-        public_id: `vehicle-${Date.now()}-${Math.round(Math.random() * 1e9)}`,
-        // Cloudinary auto-optimizes images
-        ...(isVideo ? {} : { transformation: [{ quality: 'auto', fetch_format: 'auto' }] }),
-      };
-    },
-  });
-} else {
-  storage = multer.diskStorage({
-    destination: (_req, _file, cb) => {
-      cb(null, uploadsDir);
-    },
-    filename: (_req, file, cb) => {
-      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-      const ext = path.extname(file.originalname);
-      cb(null, `vehicle-${uniqueSuffix}${ext}`);
-    },
-  });
-}
+// ALWAYS use local disk storage temporarily. This allows us to use Cloudinary's upload_large for videos
+// which is required for videos over 20MB. multer-storage-cloudinary crashes on large videos.
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const ext = path.extname(file.originalname);
+    cb(null, `vehicle-${uniqueSuffix}${ext}`);
+  },
+});
 
 const ALLOWED_IMAGE_MIMES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic'];
 const ALLOWED_VIDEO_MIMES = ['video/mp4', 'video/quicktime', 'video/avi', 'video/x-matroska', 'video/webm', 'video/x-msvideo'];
@@ -89,12 +69,11 @@ router.post('/', authenticateToken, (req: Request, res: Response, next: express.
       }
       return res.status(400).json({ error: `Upload error: ${err.message}` });
     } else if (err) {
-      // Could be Cloudinary 413 or unsupported file type
       return res.status(413).json({ error: err.message || 'File too large or upload rejected.' });
     }
     next();
   });
-}, (req: Request, res: Response): void => {
+}, async (req: Request, res: Response): Promise<void> => {
   const files = req.files as Express.Multer.File[];
 
   if (!files || files.length === 0) {
@@ -103,24 +82,53 @@ router.post('/', authenticateToken, (req: Request, res: Response, next: express.
   }
 
   const API_URL = process.env.API_URL || 'http://localhost:5000';
+  const useCloudinary = !!(process.env.CLOUDINARY_URL || process.env.CLOUDINARY_CLOUD_NAME);
 
-  const urls = files.map(file => {
-    let url = '';
-    if ((file as any).path && (file as any).path.startsWith('http')) {
-      url = (file as any).path; // Cloudinary URL
-    } else if ((file as any).secure_url) {
-      url = (file as any).secure_url; // Cloudinary secure URL
-    } else {
-      url = `${API_URL}/uploads/${file.filename}`; // Local absolute URL
+  try {
+    const urls = [];
+
+    for (const file of files) {
+      const isVideo = file.mimetype.startsWith('video/');
+      let finalUrl = '';
+
+      if (useCloudinary) {
+        // Upload to Cloudinary using upload_large (supports chunked uploads for large videos)
+        const result = await cloudinary.uploader.upload_large(file.path, {
+          folder: 'car-dealer-uploads',
+          resource_type: isVideo ? 'video' : 'image',
+          public_id: `vehicle-${Date.now()}-${Math.round(Math.random() * 1e9)}`,
+        });
+        finalUrl = result.secure_url;
+        
+        // Delete local temporary file
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      } else {
+        // Local fallback
+        finalUrl = `${API_URL}/uploads/${file.filename}`;
+      }
+
+      urls.push({
+        url: finalUrl,
+        type: isVideo ? 'video' : 'image',
+        originalName: file.originalname,
+      });
     }
-    return {
-      url,
-      type: file.mimetype.startsWith('video/') ? 'video' : 'image',
-      originalName: file.originalname,
-    };
-  });
 
-  res.json({ files: urls });
+    res.json({ files: urls });
+  } catch (error: any) {
+    console.error('Cloudinary upload error:', error);
+    
+    // Clean up any remaining temporary files
+    for (const file of files) {
+      if (fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+    }
+    
+    res.status(500).json({ error: `Failed to upload to cloud: ${error.message || String(error)}` });
+  }
 });
 
 export default router;

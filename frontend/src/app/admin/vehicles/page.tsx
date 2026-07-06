@@ -120,49 +120,52 @@ export default function AdminVehiclesPage() {
   const years = form.brand ? getYears(form.brand).map(String) : Array.from({ length: 2026 - 1990 + 1 }, (_, i) => String(2026 - i));
   const packages = form.brand ? getSpecialPackages(form.brand) : [];
 
-  useEffect(() => {
-    async function loadVehicles() {
-      try {
-        const data = await fetchApi('/inventory/admin');
-        setVehicles(data);
-        
-        // Auto-edit if query param is present
-        if (typeof window !== 'undefined') {
-          const params = new URLSearchParams(window.location.search);
-          const editId = params.get('edit');
-          if (editId) {
-            const vehicle = data.find((v: any) => v.id === Number(editId));
-            if (vehicle) {
-              setForm({
-                ...emptyForm,
-                ...vehicle,
-                year: String(vehicle.year),
-                price: vehicle.price ? String(vehicle.price) : '',
-                mileage: vehicle.mileage ? String(vehicle.mileage) : '',
-                images: vehicle.images || [],
-                videos: vehicle.videos || [],
-                specialPackages: vehicle.specialPackages || [],
-                techFeatures: vehicle.techFeatures || [],
-                purchaseCost: vehicle.purchaseCost ? String(vehicle.purchaseCost) : '',
-                shippingCost: vehicle.shippingCost ? String(vehicle.shippingCost) : '',
-                customsCost: vehicle.customsCost ? String(vehicle.customsCost) : '',
-                maintenanceCost: vehicle.maintenanceCost ? String(vehicle.maintenanceCost) : '',
-                otherCosts: vehicle.otherCosts ? String(vehicle.otherCosts) : '',
-                soldPrice: vehicle.soldPrice ? String(vehicle.soldPrice) : '',
-              });
-              setEditingId(vehicle.id);
-              setShowForm(true);
-            }
+  async function loadVehicles() {
+    try {
+      const data = await fetchApi('/inventory/admin');
+      setVehicles(data);
+      
+      // Auto-edit if query param is present
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const editId = params.get('edit');
+        if (editId) {
+          const vehicle = data.find((v: any) => v.id === Number(editId));
+          if (vehicle) {
+            setForm({
+              ...emptyForm,
+              ...vehicle,
+              year: String(vehicle.year),
+              price: vehicle.price ? String(vehicle.price) : '',
+              mileage: vehicle.mileage ? String(vehicle.mileage) : '',
+              images: vehicle.images || [],
+              videos: vehicle.videos || [],
+              specialPackages: vehicle.specialPackages || [],
+              techFeatures: vehicle.techFeatures || [],
+              purchaseCost: vehicle.purchaseCost ? String(vehicle.purchaseCost) : '',
+              shippingCost: vehicle.shippingCost ? String(vehicle.shippingCost) : '',
+              customsCost: vehicle.customsCost ? String(vehicle.customsCost) : '',
+              maintenanceCost: vehicle.maintenanceCost ? String(vehicle.maintenanceCost) : '',
+              otherCosts: vehicle.otherCosts ? String(vehicle.otherCosts) : '',
+              soldPrice: vehicle.soldPrice ? String(vehicle.soldPrice) : '',
+            });
+            setEditingId(vehicle.id);
+            setShowForm(true);
+            
+            // Clean up URL without refreshing the page
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, '', newUrl);
           }
         }
-      } catch (err) {
-        console.error('Failed to load vehicles:', err);
-      } finally {
-        setLoading(false);
       }
+    } catch (err) {
+      console.error('Failed to load vehicles:', err);
+    } finally {
+      setLoading(false);
     }
-    loadVehicles();
-  }, []);
+  }
+
+  useEffect(() => { loadVehicles(); }, []);
 
   useEffect(() => {
     async function loadTrims() {
