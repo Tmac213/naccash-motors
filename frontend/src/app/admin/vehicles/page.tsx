@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { Pencil, Trash2, Plus, X, Save, CarFront, Camera, Upload, Image } from 'lucide-react';
+import { Pencil, Trash2, Plus, X, Save, CarFront, Camera, Image, Video, Film } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 import {
   BRANDS, getModels, getYears,
@@ -18,6 +18,8 @@ const emptyForm = {
   // Basic
   vin: '', brand: '', model: '', trim: '', year: '', price: '', status: 'Available', condition: 'Used',
   mileage: '', description: '', image: '',
+  images: [] as string[],
+  videos: [] as string[],
   // Engine
   transmission: '', fuelType: '', engineCapacity: '', drivetrain: '',
   // Aesthetics
@@ -41,7 +43,6 @@ function Select({ label, id, value, onChange, options, placeholder = 'Select...'
   placeholder?: string; disabled?: boolean; required?: boolean;
 }) {
   const allOptions = value && !options.includes(value) ? [value, ...options] : options;
-  
   return (
     <div>
       <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">
@@ -105,11 +106,12 @@ export default function AdminVehiclesPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [imageUploading, setImageUploading] = useState(false);
+  const [mediaUploading, setMediaUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   const [decodingVin, setDecodingVin] = useState(false);
   const [nhtsaTrims, setNhtsaTrims] = useState<string[]>([]);
   const [loadingTrims, setLoadingTrims] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const set = (key: keyof FormState) => (value: any) => setForm(prev => ({ ...prev, [key]: value }));
@@ -133,10 +135,7 @@ export default function AdminVehiclesPage() {
 
   useEffect(() => {
     async function loadTrims() {
-      if (!form.brand || !form.year) {
-        setNhtsaTrims([]);
-        return;
-      }
+      if (!form.brand || !form.year) { setNhtsaTrims([]); return; }
       setLoadingTrims(true);
       try {
         const data = await fetchApi(`/nhtsa/models/${encodeURIComponent(form.brand)}/${form.year}`);
@@ -164,14 +163,11 @@ export default function AdminVehiclesPage() {
           const item = data.Results.find((r: any) => r.Variable === variable && r.Value && r.Value !== 'Not Applicable');
           return item ? item.Value : null;
         };
-        
         const errorCode = getVal('Error Code');
         const errorText = getVal('Error Text');
-
         if (errorCode && errorCode !== '0') {
           alert(`NHTSA Registry Warning: ${errorText || 'This VIN contains errors or is not fully registered in the US database.'} Only partial information could be retrieved.`);
         }
-
         const make = getVal('Make');
         const model = getVal('Model');
         const year = getVal('Model Year');
@@ -181,22 +177,17 @@ export default function AdminVehiclesPage() {
         const fuel = getVal('Fuel Type - Primary');
         const body = getVal('Body Class');
         const trans = getVal('Transmission Style');
-
         const updates: any = {};
         if (make) {
-          // Try to match brand (e.g. BMW)
           const matchedBrand = BRANDS.find(b => b.toUpperCase() === make.toUpperCase());
-          if (matchedBrand) updates.brand = matchedBrand;
-          else updates.brand = make;
+          updates.brand = matchedBrand || make;
         }
         if (model) updates.model = model;
         if (year) updates.year = year;
         if (trim) updates.trim = trim;
         if (displacement) {
-          // E.g., 3.0 -> 3.0L
           const matchedCap = ENGINE_CAPACITIES.find(c => c.startsWith(parseFloat(displacement).toFixed(1)));
-          if (matchedCap) updates.engineCapacity = matchedCap;
-          else updates.engineCapacity = `${parseFloat(displacement).toFixed(1)}L`;
+          updates.engineCapacity = matchedCap || `${parseFloat(displacement).toFixed(1)}L`;
         }
         if (fuel) {
           if (fuel.includes('Gasoline')) updates.fuelType = 'Gasoline (Benzine)';
@@ -224,7 +215,6 @@ export default function AdminVehiclesPage() {
           else if (trans.includes('Dual Clutch') || trans.includes('DCT')) updates.transmission = 'Dual-Clutch (DCT)';
           else updates.transmission = trans;
         }
-
         setForm(prev => ({ ...prev, ...updates }));
       }
     } catch (err) {
@@ -235,32 +225,108 @@ export default function AdminVehiclesPage() {
     }
   };
 
-  const handleImageFile = async (file: File) => {
-    if (!file) return;
-    setImageUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
-      const token = localStorage.getItem('token');
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const res = await fetch(`${API_URL}/api/upload`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-      if (!res.ok) throw new Error('Upload failed');
-      const data = await res.json();
-      const finalUrl = data.url.startsWith('http') ? data.url : `${API_URL}${data.url}`;
-      set('image')(finalUrl);
-    } catch (err) {
-      console.error('Upload error:', err);
-      // Fallback: convert to base64
-      const reader = new FileReader();
-      reader.onload = e => set('image')(e.target?.result as string);
-      reader.readAsDataURL(file);
-    } finally {
-      setImageUploading(false);
-    }
+  // Upload multiple files (images and/or videos) with progress tracking
+  const handleMediaFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setMediaUploading(true);
+    setUploadProgress(`Preparing upload...`);
+
+    const formData = new FormData();
+    Array.from(files).forEach(f => formData.append('media', f));
+    const token = localStorage.getItem('token');
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_URL}/api/upload`);
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+    const startTime = Date.now();
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const percentComplete = Math.round((e.loaded / e.total) * 100);
+        const timeElapsed = (Date.now() - startTime) / 1000;
+        const uploadSpeed = e.loaded / timeElapsed; // bytes per second
+        const timeRemaining = (e.total - e.loaded) / uploadSpeed; // seconds
+        
+        const formatTime = (secs: number) => {
+          if (!isFinite(secs) || secs < 0) return 'calculating...';
+          if (secs < 60) return `${Math.ceil(secs)}s`;
+          const m = Math.floor(secs / 60);
+          const s = Math.ceil(secs % 60);
+          return `${m}m ${s}s`;
+        };
+
+        setUploadProgress(`Uploading... ${percentComplete}% (Time left: ${formatTime(timeRemaining)})`);
+      }
+    };
+
+    xhr.onload = () => {
+      setMediaUploading(false);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          const uploaded: { url: string; type: string }[] = data.files || [];
+          const newImages = uploaded.filter(f => f.type === 'image').map(f => f.url);
+          const newVideos = uploaded.filter(f => f.type === 'video').map(f => f.url);
+
+          setForm(prev => {
+            const updatedImages = [...prev.images, ...newImages];
+            const updatedVideos = [...prev.videos, ...newVideos];
+            return {
+              ...prev,
+              image: prev.image || updatedImages[0] || prev.image,
+              images: updatedImages,
+              videos: updatedVideos,
+            };
+          });
+          setUploadProgress(`✓ ${uploaded.length} file(s) uploaded successfully`);
+          setTimeout(() => setUploadProgress(''), 3000);
+        } catch (e) {
+          setUploadProgress('');
+          alert(`Invalid response from server`);
+        }
+      } else {
+        setUploadProgress('');
+        let errMsg = `Upload failed (Status ${xhr.status})`;
+        try {
+          const res = JSON.parse(xhr.responseText);
+          if (res.error) errMsg = res.error;
+        } catch (e) {
+          if (xhr.status === 413) errMsg = 'File is too large! (Error 413: Payload Too Large). Check if the file size exceeds the server or Cloudinary limits.';
+        }
+        alert(errMsg);
+      }
+    };
+
+    xhr.onerror = () => {
+      setMediaUploading(false);
+      setUploadProgress('');
+      alert('Network error occurred during upload. The file might be too large, or your connection dropped.');
+    };
+
+    xhr.send(formData);
+  };
+
+  const removeImage = (idx: number) => {
+    setForm(prev => {
+      const updated = prev.images.filter((_, i) => i !== idx);
+      // If removed image was the cover, update cover
+      const removedUrl = prev.images[idx];
+      return {
+        ...prev,
+        images: updated,
+        image: prev.image === removedUrl ? (updated[0] || '') : prev.image,
+      };
+    });
+  };
+
+  const removeVideo = (idx: number) => {
+    setForm(prev => ({ ...prev, videos: prev.videos.filter((_, i) => i !== idx) }));
+  };
+
+  const setCoverImage = (url: string) => {
+    setForm(prev => ({ ...prev, image: url }));
   };
 
   const openAddForm = () => {
@@ -276,6 +342,8 @@ export default function AdminVehiclesPage() {
       vin: v.vin || '', brand: v.brand || '', model: v.model || '', trim: v.trim || '', year: String(v.year || ''),
       price: v.price || '', status: v.status || 'Available', condition: v.condition || 'Used',
       mileage: v.mileage || '', description: v.description || '', image: v.image || '',
+      images: v.images ? JSON.parse(v.images) : [],
+      videos: v.videos ? JSON.parse(v.videos) : [],
       transmission: v.transmission || '', fuelType: v.fuelType || '',
       engineCapacity: v.engineCapacity || '', drivetrain: v.drivetrain || '',
       exteriorColor: v.exteriorColor || '', interiorColor: v.interiorColor || '',
@@ -301,6 +369,8 @@ export default function AdminVehiclesPage() {
         ...form,
         specialPackages: JSON.stringify(form.specialPackages),
         techFeatures: JSON.stringify(form.techFeatures),
+        images: JSON.stringify(form.images),
+        videos: JSON.stringify(form.videos),
       };
       if (editingId !== null) {
         await fetchApi(`/inventory/${editingId}`, { method: 'PUT', body: JSON.stringify(payload) });
@@ -387,7 +457,7 @@ export default function AdminVehiclesPage() {
                     <span className={`text-xs font-bold uppercase px-2.5 py-1 rounded-full ${
                       v.status === 'Available' ? 'bg-green-900/50 text-green-400' :
                       v.status === 'Reserved' ? 'bg-yellow-900/50 text-yellow-400' :
-                      v.status === 'Sold Out' ? 'bg-red-900/50 text-red-400' : 
+                      v.status === 'Sold Out' ? 'bg-red-900/50 text-red-400' :
                       v.status === 'Coming Soon' ? 'bg-purple-900/50 text-purple-400' : 'bg-gray-800 text-gray-400'
                     }`}>{v.status}</span>
                   </td>
@@ -428,8 +498,7 @@ export default function AdminVehiclesPage() {
             </div>
 
             <form onSubmit={handleSave} className="p-6 md:p-8 space-y-12">
-            
-            {/* Compute dynamic required fields */}
+
             {(() => {
               const isComingSoon = form.status === 'Coming Soon';
               const req = !isComingSoon;
@@ -442,15 +511,15 @@ export default function AdminVehiclesPage() {
                 <CarFront className="w-5 h-5" /> Auto-Fill Specs via VIN
               </h3>
               <div className="flex gap-4">
-                <input 
-                  type="text" 
-                  value={form.vin} 
+                <input
+                  type="text"
+                  value={form.vin}
                   onChange={e => set('vin')(e.target.value.toUpperCase())}
                   placeholder="Enter 17-digit Vehicle Identification Number (VIN)"
                   className="flex-1 bg-black/50 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-gold uppercase tracking-widest font-mono"
                 />
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={handleVinDecode}
                   disabled={decodingVin}
                   className="bg-gold text-black px-6 py-3 rounded-lg font-bold uppercase tracking-wider hover:bg-white transition-colors disabled:opacity-50 whitespace-nowrap"
@@ -465,12 +534,11 @@ export default function AdminVehiclesPage() {
 
             <div className="grid md:grid-cols-2 gap-8">
               {formError && (
-                <div className="bg-red-900/30 border border-red-500/50 text-red-400 rounded-lg px-4 py-3 text-sm">{formError}</div>
+                <div className="md:col-span-2 bg-red-900/30 border border-red-500/50 text-red-400 rounded-lg px-4 py-3 text-sm">{formError}</div>
               )}
 
               {/* ─── BASIC INFO ─── */}
               <Section title="Basic Information">
-                {/* Brand */}
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Brand *</label>
                   <select required id="brand" value={form.brand}
@@ -480,8 +548,6 @@ export default function AdminVehiclesPage() {
                     {(form.brand && !BRANDS.includes(form.brand) ? [form.brand, ...BRANDS] : BRANDS).map(b => <option key={b} value={b}>{b}</option>)}
                   </select>
                 </div>
-
-                {/* Model */}
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Model *</label>
                   <select required id="model" value={form.model}
@@ -492,8 +558,6 @@ export default function AdminVehiclesPage() {
                     {(form.model && !models.includes(form.model) ? [form.model, ...models] : models).map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </div>
-
-                {/* Trim / Exact Model */}
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">
                     Trim / Exact Model {loadingTrims && <span className="text-gold lowercase ml-2 animate-pulse">loading...</span>}
@@ -507,8 +571,6 @@ export default function AdminVehiclesPage() {
                   </datalist>
                   <p className="text-xs text-gray-500 mt-1">Select from dropdown or type custom trim</p>
                 </div>
-
-                {/* Year */}
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Year *</label>
                   <select required id="year" value={form.year}
@@ -519,8 +581,6 @@ export default function AdminVehiclesPage() {
                     {years.map(y => <option key={y} value={y}>{y}</option>)}
                   </select>
                 </div>
-
-                {/* Price */}
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">
                     Price (USD) {req && <span className="text-gold">*</span>}
@@ -529,11 +589,8 @@ export default function AdminVehiclesPage() {
                     className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-gold"
                     placeholder="e.g. 215000" />
                 </div>
-
                 <Select label="Status" id="status" value={form.status} onChange={set('status')} options={STATUSES} required={true} />
                 <Select label="Condition" id="condition" value={form.condition} onChange={set('condition')} options={CONDITIONS} required={true} />
-
-                {/* Mileage */}
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">
                     Mileage (km) {req && <span className="text-gold">*</span>}
@@ -542,57 +599,125 @@ export default function AdminVehiclesPage() {
                     className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-gold"
                     placeholder="e.g. 12000" />
                 </div>
-
                 <Select label="Body Type" id="bodyType" value={form.bodyType} onChange={set('bodyType')} options={BODY_TYPES} />
               </Section>
 
-              {/* ─── IMAGE ─── */}
+              {/* ─── MEDIA GALLERY ─── */}
               <div className="border border-white/10 rounded-xl overflow-hidden">
-                <div className="bg-white/5 px-5 py-3 border-b border-white/10 flex items-center justify-between">
+                <div className="bg-white/5 px-5 py-3 border-b border-white/10">
                   <h3 className="text-sm font-bold uppercase tracking-widest text-gold">
-                    Vehicle Image {req && <span>*</span>}
+                    Photos & Videos {req && <span>*</span>}
                   </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Upload multiple photos and videos. Click an image to set it as cover.</p>
                 </div>
-                <div className="p-5 space-y-4">
-                  {/* Image preview */}
-                  {form.image && (
-                    <div className="relative h-48 rounded-lg overflow-hidden bg-black/30">
-                      <img src={form.image} alt="Preview" className="w-full h-full object-cover"
-                        onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
-                      <button type="button" onClick={() => set('image')('')}
-                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-red-600 text-white flex items-center justify-center transition-colors">
-                        <X className="w-4 h-4" />
-                      </button>
+                <div className="p-5 space-y-5">
+
+                  {/* Upload area */}
+                  <div
+                    className="border-2 border-dashed border-white/20 hover:border-gold/50 rounded-xl p-6 text-center transition-colors cursor-pointer group"
+                    onClick={() => mediaInputRef.current?.click()}
+                    onDragOver={e => { e.preventDefault(); }}
+                    onDrop={e => { e.preventDefault(); handleMediaFiles(e.dataTransfer.files); }}
+                  >
+                    <input
+                      ref={mediaInputRef}
+                      type="file"
+                      accept="image/*,video/*"
+                      multiple
+                      className="hidden"
+                      onChange={e => { handleMediaFiles(e.target.files); e.target.value = ''; }}
+                    />
+                    <input
+                      ref={cameraInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={e => { handleMediaFiles(e.target.files); e.target.value = ''; }}
+                    />
+                    {mediaUploading ? (
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold"></div>
+                        <p className="text-gold text-sm">{uploadProgress}</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="flex gap-3 text-gray-500 group-hover:text-gold transition-colors">
+                          <Image className="w-7 h-7" />
+                          <Film className="w-7 h-7" />
+                        </div>
+                        <p className="text-sm text-gray-400 group-hover:text-white transition-colors">
+                          <span className="text-gold font-semibold">Click to upload</span> or drag & drop
+                        </p>
+                        <p className="text-xs text-gray-600">Images (JPG, PNG, WEBP) & Videos (MP4, MOV, MKV) — up to 200MB per file</p>
+                        {uploadProgress && <p className="text-green-400 text-xs font-semibold mt-1">{uploadProgress}</p>}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Camera button for mobile */}
+                  <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={mediaUploading}
+                    className="w-full flex items-center justify-center gap-2 border border-white/20 hover:border-gold text-gray-400 hover:text-white rounded-lg py-2.5 transition-colors text-sm">
+                    <Camera className="w-4 h-4" /> Take Photo with Camera
+                  </button>
+
+                  {/* Images preview grid */}
+                  {form.images.length > 0 && (
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1">
+                        <Image className="w-3 h-3" /> Photos ({form.images.length}) — click to set cover
+                      </p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {form.images.map((url, idx) => (
+                          <div key={idx} className="relative group/img aspect-video rounded-lg overflow-hidden bg-black/30">
+                            <img
+                              src={url}
+                              alt={`Photo ${idx + 1}`}
+                              className="w-full h-full object-cover cursor-pointer"
+                              onClick={() => setCoverImage(url)}
+                            />
+                            {form.image === url && (
+                              <div className="absolute bottom-0 left-0 right-0 bg-gold text-black text-[10px] font-bold text-center py-0.5">COVER</div>
+                            )}
+                            <button type="button" onClick={() => removeImage(idx)}
+                              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/80 hover:bg-red-600 text-white flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
-                  {/* Upload buttons */}
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    {/* Gallery */}
-                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
-                      onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile(f); e.target.value = ''; }} />
-                    <button type="button" onClick={() => fileInputRef.current?.click()} disabled={imageUploading}
-                      className="flex-1 flex items-center justify-center gap-2 border border-white/20 hover:border-gold text-gray-400 hover:text-white rounded-lg py-3 transition-colors">
-                      <Image className="w-4 h-4" />
-                      {imageUploading ? 'Uploading...' : 'Browse Gallery'}
-                    </button>
-                    {/* Camera */}
-                    <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden"
-                      onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile(f); e.target.value = ''; }} />
-                    <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={imageUploading}
-                      className="flex-1 flex items-center justify-center gap-2 border border-white/20 hover:border-gold text-gray-400 hover:text-white rounded-lg py-3 transition-colors">
-                      <Camera className="w-4 h-4" /> Take Photo
-                    </button>
-                  </div>
-                  {/* URL fallback */}
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Or paste image URL</label>
-                    <div className="flex gap-2">
-                      <input type="url" id="imageUrl" value={form.image.startsWith('http') && !form.image.startsWith('http://localhost') ? form.image : ''}
-                        required={req && !form.image}
-                        onChange={e => set('image')(e.target.value)}
-                        className="flex-1 bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-gold"
-                        placeholder="https://..." />
+
+                  {/* Videos preview */}
+                  {form.videos.length > 0 && (
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1">
+                        <Video className="w-3 h-3" /> Videos ({form.videos.length})
+                      </p>
+                      <div className="space-y-2">
+                        {form.videos.map((url, idx) => (
+                          <div key={idx} className="relative group/vid rounded-lg overflow-hidden bg-black/30 border border-white/10">
+                            <video src={url} controls className="w-full max-h-40 object-contain" />
+                            <button type="button" onClick={() => removeVideo(idx)}
+                              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/80 hover:bg-red-600 text-white flex items-center justify-center transition-colors">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                  )}
+
+                  {/* Cover image URL fallback */}
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Or paste cover image URL</label>
+                    <input type="url" id="imageUrl"
+                      value={form.image.startsWith('http') && !form.image.startsWith('http://localhost') ? form.image : ''}
+                      required={req && !form.image && form.images.length === 0}
+                      onChange={e => set('image')(e.target.value)}
+                      className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-gold"
+                      placeholder="https://..." />
                   </div>
                 </div>
               </div>
@@ -622,20 +747,16 @@ export default function AdminVehiclesPage() {
               <Section title="Premium Features & Packages">
                 <Select label="Sunroof / Roof" id="sunroof" value={form.sunroof} onChange={set('sunroof')} options={SUNROOF_OPTIONS} />
                 <Select label="Lighting" id="lighting" value={form.lighting} onChange={set('lighting')} options={LIGHTING_OPTIONS} />
-
-                {/* Special Packages — brand-specific checkboxes */}
                 {packages.length > 0 && (
                   <CheckboxGroup label="Special Packages" options={packages}
                     selected={form.specialPackages} onChange={set('specialPackages')} />
                 )}
-
-                {/* Tech Features */}
                 <CheckboxGroup label="Tech Features" options={TECH_FEATURES}
                   selected={form.techFeatures} onChange={set('techFeatures')} />
               </Section>
 
               {/* ─── DESCRIPTION ─── */}
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Description</label>
                 <textarea id="description" value={form.description} onChange={e => set('description')(e.target.value)} rows={4}
                   className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-gold resize-none"
@@ -643,8 +764,8 @@ export default function AdminVehiclesPage() {
               </div>
 
               {/* ─── INTERNAL FINANCIALS ─── */}
-              <div className="border border-red-500/30 rounded-xl overflow-hidden mt-8">
-                <div className="bg-red-500/10 px-5 py-3 border-b border-red-500/30 flex items-center justify-between">
+              <div className="md:col-span-2 border border-red-500/30 rounded-xl overflow-hidden mt-8">
+                <div className="bg-red-500/10 px-5 py-3 border-b border-red-500/30">
                   <h3 className="text-sm font-bold uppercase tracking-widest text-red-500">Internal Accounting & Financials (Private)</h3>
                 </div>
                 <div className="p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -680,7 +801,6 @@ export default function AdminVehiclesPage() {
                         className="w-full bg-black/50 border border-gold text-white rounded-lg px-4 py-3 focus:outline-none focus:border-gold" />
                     </div>
                   )}
-
                   <div className="md:col-span-3 mt-4 bg-black/40 p-4 rounded-lg border border-white/5 flex flex-wrap gap-6 justify-between items-center">
                     {(() => {
                       const totalCost = (Number(form.purchaseCost) || 0) + (Number(form.shippingCost) || 0) + (Number(form.customsCost) || 0) + (Number(form.maintenanceCost) || 0) + (Number(form.otherCosts) || 0);
@@ -689,7 +809,6 @@ export default function AdminVehiclesPage() {
                       const revenue = isSold ? (Number(form.soldPrice) || 0) : askingPrice;
                       const profit = revenue - totalCost;
                       const margin = totalCost > 0 ? (profit / totalCost) * 100 : 0;
-                      
                       return (
                         <>
                           <div>
@@ -708,9 +827,7 @@ export default function AdminVehiclesPage() {
                           </div>
                           <div>
                             <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Margin</p>
-                            <p className={`text-xl font-mono ${margin >= 0 ? 'text-green-400' : 'text-red-500'}`}>
-                              {margin.toFixed(1)}%
-                            </p>
+                            <p className={`text-xl font-mono ${margin >= 0 ? 'text-green-400' : 'text-red-500'}`}>{margin.toFixed(1)}%</p>
                           </div>
                         </>
                       );
@@ -720,20 +837,20 @@ export default function AdminVehiclesPage() {
               </div>
             </div>
 
-              {/* ─── ACTIONS ─── */}
-              <div className="flex gap-3 pt-2 sticky bottom-0 bg-[#111] pb-2">
-                <button type="button" onClick={() => setShowForm(false)}
-                  className="flex-1 border border-white/20 text-gray-400 hover:text-white hover:border-white/40 py-3 rounded-lg transition-colors font-medium">
-                  Cancel
-                </button>
-                <button type="submit" disabled={saving}
-                  className="flex-1 bg-gold text-black font-bold py-3 rounded-lg hover:bg-gold-hover transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                  {saving
-                    ? <span className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-black"></span>
-                    : <Save className="w-4 h-4" />}
-                  {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Add Vehicle'}
-                </button>
-              </div>
+            {/* ─── ACTIONS ─── */}
+            <div className="flex gap-3 pt-2 sticky bottom-0 bg-[#111] pb-2">
+              <button type="button" onClick={() => setShowForm(false)}
+                className="flex-1 border border-white/20 text-gray-400 hover:text-white hover:border-white/40 py-3 rounded-lg transition-colors font-medium">
+                Cancel
+              </button>
+              <button type="submit" disabled={saving}
+                className="flex-1 bg-gold text-black font-bold py-3 rounded-lg hover:bg-gold-hover transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                {saving
+                  ? <span className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-black"></span>
+                  : <Save className="w-4 h-4" />}
+                {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Add Vehicle'}
+              </button>
+            </div>
                 </>
               );
             })()}

@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Search } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
-
+import { BRANDS, getModels } from '@/lib/car-data';
 export default function Home() {
   const [latestVehicles, setLatestVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [brand, setBrand] = useState('');
+  const [model, setModel] = useState('');
 
   useEffect(() => {
     async function loadLatest() {
@@ -64,23 +66,42 @@ export default function Home() {
         <div className="px-6 flex flex-col md:flex-row gap-4 items-end">
           <div className="w-full md:w-1/3">
             <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Brand</label>
-            <select className="w-full bg-dark-bg border border-white/20 text-white rounded px-4 py-3 focus:outline-none focus:border-gold">
+            <select 
+              value={brand}
+              onChange={(e) => {
+                setBrand(e.target.value);
+                setModel('');
+              }}
+              className="w-full bg-dark-bg border border-white/20 text-white rounded px-4 py-3 focus:outline-none focus:border-gold"
+            >
               <option value="">All Brands</option>
-              <option value="BMW">BMW</option>
-              <option value="Mercedes">Mercedes-Benz</option>
-              <option value="Porsche">Porsche</option>
+              {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
             </select>
           </div>
           <div className="w-full md:w-1/3">
             <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Model</label>
-            <select className="w-full bg-dark-bg border border-white/20 text-white rounded px-4 py-3 focus:outline-none focus:border-gold">
+            <select 
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              disabled={!brand}
+              className="w-full bg-dark-bg border border-white/20 text-white rounded px-4 py-3 focus:outline-none focus:border-gold"
+            >
               <option value="">Any Model</option>
+              {brand && getModels(brand).map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
           <div className="w-full md:w-1/3 flex">
-            <Link href="/inventory" className="w-full bg-white text-black font-bold uppercase tracking-wider py-3 flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors rounded">
-              <Search className="w-5 h-5" /> Search
-            </Link>
+            {(() => {
+              const params = new URLSearchParams();
+              if (brand) params.append('brand', brand);
+              if (model) params.append('model', model);
+              const queryString = params.toString();
+              return (
+                <Link href={`/inventory${queryString ? `?${queryString}` : ''}`} className="w-full bg-white text-black font-bold uppercase tracking-wider py-3 flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors rounded">
+                  <Search className="w-5 h-5" /> Search
+                </Link>
+              );
+            })()}
           </div>
         </div>
       </section>

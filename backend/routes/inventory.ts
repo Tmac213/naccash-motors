@@ -71,6 +71,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
   try {
     const {
       vin, brand, year, model, trim, transmission, status, mileage, condition, price, description, image,
+      images, videos,
       fuelType, engineCapacity, drivetrain, exteriorColor, interiorColor, bodyType,
       numberOfOwners, keys, regionalSpecs, sunroof, lighting, specialPackages, techFeatures,
       purchaseCost, shippingCost, customsCost, maintenanceCost, otherCosts, soldPrice
@@ -85,6 +86,8 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
         condition,
         price: price ? parseFloat(price) : null,
         description, image: image || null,
+        images: Array.isArray(images) ? JSON.stringify(images) : (images || null),
+        videos: Array.isArray(videos) ? JSON.stringify(videos) : (videos || null),
         fuelType, engineCapacity, drivetrain,
         exteriorColor, interiorColor, bodyType,
         numberOfOwners, keys, regionalSpecs,
