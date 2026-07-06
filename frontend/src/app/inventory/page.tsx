@@ -59,7 +59,15 @@ function CarDetail({ id }: { id: string }) {
     );
   }
 
-  const images = car.images && car.images.length > 0 ? car.images : [car.image].filter(Boolean);
+  // Safely parse arrays (backend now sends arrays, but guard against JSON strings as fallback)
+  const parseArr = (val: any): string[] => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val.filter(Boolean);
+    try { const p = JSON.parse(val); return Array.isArray(p) ? p.filter(Boolean) : []; } catch { return []; }
+  };
+
+  const images = parseArr(car.images).length > 0 ? parseArr(car.images) : [car.image].filter(Boolean);
+  const videos = parseArr(car.videos);
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
@@ -120,6 +128,24 @@ function CarDetail({ id }: { id: string }) {
                   >
                     <img src={img} alt="" className="w-full h-full object-cover" />
                   </button>
+                ))}
+              </div>
+            )}
+
+            {/* Video Gallery */}
+            {videos.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold uppercase tracking-widest text-amber-400">Videos</h3>
+                {videos.map((vid: string, i: number) => (
+                  <div key={i} className="rounded-2xl overflow-hidden border border-white/10 bg-black">
+                    <video
+                      src={vid}
+                      controls
+                      preload="metadata"
+                      className="w-full max-h-72 object-contain"
+                      playsInline
+                    />
+                  </div>
                 ))}
               </div>
             )}

@@ -3,6 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pencil, Trash2, Plus, X, Save, CarFront, Camera, Image, Video, Film } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
+import app from '@/lib/firebase';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+
+const firebaseStorage = getStorage(app);
 import {
   BRANDS, getModels, getYears,
   FUEL_TYPES, DRIVETRAINS, TRANSMISSIONS, ENGINE_CAPACITIES,
@@ -259,88 +263,81 @@ export default function AdminVehiclesPage() {
     }
   };
 
-  // Upload multiple files (images and/or videos) with progress tracking
+  // Upload multiple files directly to Firebase Storage with progress tracking
   const handleMediaFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setMediaUploading(true);
-    setUploadProgress(`Preparing upload...`);
 
-    const formData = new FormData();
-    Array.from(files).forEach(f => formData.append('media', f));
-    const token = localStorage.getItem('token');
-    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-    const uploadUrl = API_BASE.endsWith('/api') ? `${API_BASE}/upload` : `${API_BASE}/api/upload`;
+    const fileArray = Array.from(files);
+    const total = fileArray.length;
+    let completed = 0;
+    const newImages: string[] = [];
+    const newVideos: string[] = [];
 
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', uploadUrl);
-    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-
-    const startTime = Date.now();
-
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        const percentComplete = Math.round((e.loaded / e.total) * 100);
-        const timeElapsed = (Date.now() - startTime) / 1000;
-        const uploadSpeed = e.loaded / timeElapsed; // bytes per second
-        const timeRemaining = (e.total - e.loaded) / uploadSpeed; // seconds
-        
-        const formatTime = (secs: number) => {
-          if (!isFinite(secs) || secs < 0) return 'calculating...';
-          if (secs < 60) return `${Math.ceil(secs)}s`;
-          const m = Math.floor(secs / 60);
-          const s = Math.ceil(secs % 60);
-          return `${m}m ${s}s`;
-        };
-
-        setUploadProgress(`Uploading... ${percentComplete}% (Time left: ${formatTime(timeRemaining)})`);
-      }
+    const formatTime = (secs: number) => {
+      if (!isFinite(secs) || secs < 0) return 'calculating...';
+      if (secs < 60) return `${Math.ceil(secs)}s`;
+      const m = Math.floor(secs / 60);
+      const s = Math.ceil(secs % 60);
+      return `${m}m ${s}s`;
     };
 
-    xhr.onload = () => {
-      setMediaUploading(false);
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const data = JSON.parse(xhr.responseText);
-          const uploaded: { url: string; type: string }[] = data.files || [];
-          const newImages = uploaded.filter(f => f.type === 'image').map(f => f.url);
-          const newVideos = uploaded.filter(f => f.type === 'video').map(f => f.url);
+    setUploadProgress(`Preparing ${total} file(s)...`);
 
-          setForm(prev => {
-            const updatedImages = [...prev.images, ...newImages];
-            const updatedVideos = [...prev.videos, ...newVideos];
-            return {
-              ...prev,
-              image: prev.image || updatedImages[0] || prev.image,
-              images: updatedImages,
-              videos: updatedVideos,
-            };
-          });
-          setUploadProgress(`✓ ${uploaded.length} file(s) uploaded successfully`);
-          setTimeout(() => setUploadProgress(''), 3000);
-        } catch (e) {
-          setUploadProgress('');
-          alert(`Invalid response from server`);
-        }
-      } else {
-        setUploadProgress('');
-        let errMsg = `Upload failed (Status ${xhr.status})`;
-        try {
-          const res = JSON.parse(xhr.responseText);
-          if (res.error) errMsg = res.error;
-        } catch (e) {
-          if (xhr.status === 413) errMsg = 'File is too large! (Error 413: Payload Too Large). Check if the file size exceeds the server or Cloudinary limits.';
-        }
-        alert(errMsg);
-      }
-    };
+    await Promise.all(fileArray.map((file) => new Promise<void>((resolve, reject) => {
+      const isVideo = file.type.startsWith('video/');
+      const folder = isVideo ? 'vehicles/videos' : 'vehicles/images';
+      const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.name}`;
+      const storageRef = ref(firebaseStorage, `${folder}/${uniqueName}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+      const startTime = Date.now();
 
-    xhr.onerror = () => {
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const percent = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+          const elapsed = (Date.now() - startTime) / 1000;
+          const speed = snapshot.bytesTransferred / elapsed;
+          const remaining = (snapshot.totalBytes - snapshot.bytesTransferred) / speed;
+          setUploadProgress(
+            total === 1
+              ? `Uploading... ${percent}% (${formatTime(remaining)} left)`
+              : `Uploading file ${completed + 1}/${total} — ${percent}% (${formatTime(remaining)} left)`
+          );
+        },
+        (error) => {
+          console.error('Firebase upload error:', error);
+          reject(error);
+        },
+        async () => {
+          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+          if (isVideo) newVideos.push(downloadUrl);
+          else newImages.push(downloadUrl);
+          completed++;
+          setUploadProgress(`✓ ${completed}/${total} uploaded`);
+          resolve();
+        }
+      );
+    }))).catch((err) => {
       setMediaUploading(false);
       setUploadProgress('');
-      alert('Network error occurred during upload. The file might be too large, or your connection dropped.');
-    };
+      alert(`Upload failed: ${err.message || String(err)}`);
+      return;
+    });
 
-    xhr.send(formData);
+    setForm(prev => {
+      const updatedImages = [...prev.images, ...newImages];
+      const updatedVideos = [...prev.videos, ...newVideos];
+      return {
+        ...prev,
+        image: prev.image || updatedImages[0] || '',
+        images: updatedImages,
+        videos: updatedVideos,
+      };
+    });
+    setMediaUploading(false);
+    setUploadProgress(`✓ ${total} file(s) uploaded successfully`);
+    setTimeout(() => setUploadProgress(''), 3000);
   };
 
   const removeImage = (idx: number) => {
