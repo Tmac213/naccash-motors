@@ -146,9 +146,26 @@ export default function AdminDashboardPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <Link href={`/admin/vehicles`} className="text-gold hover:text-white transition-colors text-sm">
-                      Edit
-                    </Link>
+                    <div className="flex justify-end gap-3">
+                      <Link href={`/admin/vehicles?edit=${v.id}`} className="text-gold hover:text-white transition-colors text-sm font-semibold">
+                        Edit
+                      </Link>
+                      <button 
+                        onClick={async () => {
+                          if (confirm(`Are you sure you want to delete this ${v.brand} ${v.model}?`)) {
+                            try {
+                              const res = await fetchApi(`/inventory/${v.id}`, { method: 'DELETE' });
+                              setVehicles(prev => prev.filter(car => car.id !== v.id));
+                            } catch (e) {
+                              alert('Failed to delete vehicle');
+                            }
+                          }
+                        }}
+                        className="text-red-400 hover:text-red-300 transition-colors text-sm font-semibold"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

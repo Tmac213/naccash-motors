@@ -120,18 +120,49 @@ export default function AdminVehiclesPage() {
   const years = form.brand ? getYears(form.brand).map(String) : Array.from({ length: 2026 - 1990 + 1 }, (_, i) => String(2026 - i));
   const packages = form.brand ? getSpecialPackages(form.brand) : [];
 
-  async function loadVehicles() {
-    try {
-      const data = await fetchApi('/inventory/admin');
-      setVehicles(data);
-    } catch (err) {
-      console.error('Failed to load vehicles:', err);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    async function loadVehicles() {
+      try {
+        const data = await fetchApi('/inventory/admin');
+        setVehicles(data);
+        
+        // Auto-edit if query param is present
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          const editId = params.get('edit');
+          if (editId) {
+            const vehicle = data.find((v: any) => v.id === Number(editId));
+            if (vehicle) {
+              setForm({
+                ...emptyForm,
+                ...vehicle,
+                year: String(vehicle.year),
+                price: vehicle.price ? String(vehicle.price) : '',
+                mileage: vehicle.mileage ? String(vehicle.mileage) : '',
+                images: vehicle.images || [],
+                videos: vehicle.videos || [],
+                specialPackages: vehicle.specialPackages || [],
+                techFeatures: vehicle.techFeatures || [],
+                purchaseCost: vehicle.purchaseCost ? String(vehicle.purchaseCost) : '',
+                shippingCost: vehicle.shippingCost ? String(vehicle.shippingCost) : '',
+                customsCost: vehicle.customsCost ? String(vehicle.customsCost) : '',
+                maintenanceCost: vehicle.maintenanceCost ? String(vehicle.maintenanceCost) : '',
+                otherCosts: vehicle.otherCosts ? String(vehicle.otherCosts) : '',
+                soldPrice: vehicle.soldPrice ? String(vehicle.soldPrice) : '',
+              });
+              setEditingId(vehicle.id);
+              setShowForm(true);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load vehicles:', err);
+      } finally {
+        setLoading(false);
+      }
     }
-  }
-
-  useEffect(() => { loadVehicles(); }, []);
+    loadVehicles();
+  }, []);
 
   useEffect(() => {
     async function loadTrims() {
@@ -234,10 +265,11 @@ export default function AdminVehiclesPage() {
     const formData = new FormData();
     Array.from(files).forEach(f => formData.append('media', f));
     const token = localStorage.getItem('token');
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+    const uploadUrl = API_BASE.endsWith('/api') ? `${API_BASE}/upload` : `${API_BASE}/api/upload`;
 
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${API_URL}/api/upload`);
+    xhr.open('POST', uploadUrl);
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
     const startTime = Date.now();
