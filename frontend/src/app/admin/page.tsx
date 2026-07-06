@@ -1,27 +1,44 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { CarFront, TrendingUp, Star, Eye, ArrowRight, Plus } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      router.push('/admin/login');
+      return;
+    }
+
     async function loadData() {
       try {
         const data = await fetchApi('/inventory/admin');
         setVehicles(data);
-      } catch (err) {
+        setError(null);
+      } catch (err: any) {
         console.error('Failed to load vehicles:', err);
+        if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
+          localStorage.removeItem('token');
+          router.push('/admin/login');
+        } else {
+          setError(err.message || 'Failed to load vehicles');
+        }
       } finally {
         setLoading(false);
       }
     }
     loadData();
-  }, []);
+  }, [router]);
 
   const available = vehicles.filter(v => v.status === 'Available').length;
   const reserved = vehicles.filter(v => v.status === 'Reserved').length;

@@ -30,6 +30,12 @@ export default function AdminLoginPage() {
     }
   };
 
+  const fillDemoCredentials = () => {
+    setEmail('admin@cardealer.com');
+    setPassword('admin123');
+    setError(null);
+  };
+
   return (
     <div className="min-h-screen bg-dark-bg flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -100,9 +106,16 @@ export default function AdminLoginPage() {
           </form>
 
           <div className="mt-6 pt-6 border-t border-white/10 text-center">
-            <p className="text-gray-600 text-xs">
-              Default: admin@cardealer.com / admin123
+            <p className="text-gray-600 text-xs mb-3">
+              Demo Credentials
             </p>
+            <button
+              type="button"
+              onClick={fillDemoCredentials}
+              className="text-gold hover:text-white text-xs uppercase tracking-wider transition-colors"
+            >
+              Use Demo Account →
+            </button>
           </div>
         </div>
       </div>
