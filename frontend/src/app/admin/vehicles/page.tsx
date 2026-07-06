@@ -301,11 +301,9 @@ export default function AdminVehiclesPage() {
           if (xhr.status === 413) errMsg = 'File is too large! (Error 413: Payload Too Large). Check if the file size exceeds the server or Cloudinary limits.';
         }
         
-        // Handle authentication errors
+        // Handle authentication errors - show message but don't force logout
         if (xhr.status === 401 || xhr.status === 403 || errMsg.includes('token')) {
-          alert('Your session has expired. Please log out and log back in to continue.');
-          localStorage.removeItem('token');
-          window.location.href = '/admin/login';
+          alert('Authentication error: ' + errMsg + '. Please try refreshing the page or logging in again if the problem persists.');
           return;
         }
         
