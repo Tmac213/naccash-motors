@@ -111,6 +111,42 @@ async function main() {
         description: 'One of only 765 ever made. The McLaren 765LT Spider is the most track-focused, driver-centric and fastest roadster McLaren has ever produced.',
         image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&q=80',
       },
+      {
+        brand: 'Tesla', model: 'Model S Plaid', year: 2023, price: 98000,
+        status: 'Available', condition: 'New', transmission: 'Automatic',
+        mileage: 0, fuelType: 'Electric', bodyType: 'Sedan',
+        exteriorColor: 'Pearl White', interiorColor: 'Black Vegan Leather',
+        drivetrain: 'AWD', engineCapacity: 'Tri-Motor', regionalSpecs: 'North American',
+        description: 'The world\'s fastest 4-door production car. 0-100 km/h in 2.4 seconds, 825 HP, and a range of 640 km. The future of electric performance.',
+        image: 'https://images.unsplash.com/photo-1594519622908-38a1c5f9d88f?auto=format&fit=crop&q=80',
+      },
+      {
+        brand: 'Jaguar', model: 'F-Type R', year: 2022, price: 89000,
+        status: 'Available', condition: 'Used', transmission: 'Automatic',
+        mileage: 22000, fuelType: 'Petrol', bodyType: 'Convertible',
+        exteriorColor: 'British Racing Green', interiorColor: 'Windsor Leather Brown',
+        drivetrain: 'RWD', engineCapacity: '5.0L V8 Supercharged', regionalSpecs: 'European',
+        description: 'Jaguar\'s ultimate convertible. 575 HP, dynamic handling, and timeless British design make this one of the most thrilling roadsters available.',
+        image: 'https://images.unsplash.com/photo-1599933575551-20a2c35782b2?auto=format&fit=crop&q=80',
+      },
+      {
+        brand: 'Corvette', model: 'C8 Stingray', year: 2023, price: 68000,
+        status: 'Available', condition: 'New', transmission: 'Automatic',
+        mileage: 150, fuelType: 'Petrol', bodyType: 'Coupe',
+        exteriorColor: 'Arctic White', interiorColor: 'Jet Black Leather',
+        drivetrain: 'RWD', engineCapacity: '6.2L V8 LT2', regionalSpecs: 'North American',
+        description: 'The legendary American sports car now with a mid-engine layout. 495 HP, 0-100 km/h in 2.9 seconds, and pure American muscle.',
+        image: 'https://images.unsplash.com/photo-1578674361440-e9b61409c330?auto=format&fit=crop&q=80',
+      },
+      {
+        brand: 'Nissan', model: 'GT-R Nismo', year: 2022, price: 210000,
+        status: 'Available', condition: 'Used', transmission: 'Automatic',
+        mileage: 8500, fuelType: 'Petrol', bodyType: 'Coupe',
+        exteriorColor: 'Midnight Purple', interiorColor: 'Black Leather',
+        drivetrain: 'AWD', engineCapacity: '3.8L V6 Twin-Turbo', regionalSpecs: 'Asian Specs',
+        description: 'The legendary Godzilla returns with 600 HP of pure Japanese engineering. 0-100 km/h in 2.7 seconds and unparalleled all-weather capability.',
+        image: 'https://images.unsplash.com/photo-1552820728-8ac41f1ce891?auto=format&fit=crop&q=80',
+      },
     ];
 
     for (const v of vehicles) {
