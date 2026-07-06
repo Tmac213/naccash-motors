@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { CarFront, TrendingUp, Star, Eye, ArrowRight, Plus } from 'lucide-react';
+import { CarFront, TrendingUp, Star, Eye, ArrowRight, Plus, Pencil, Trash2 } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 
 export default function AdminDashboardPage() {
@@ -11,6 +11,7 @@ export default function AdminDashboardPage() {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<number | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -39,6 +40,21 @@ export default function AdminDashboardPage() {
     }
     loadData();
   }, [router]);
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Delete this vehicle permanently?')) return;
+    setDeleting(id);
+    try {
+      await fetchApi(`/inventory/${id}`, { method: 'DELETE' });
+      const data = await fetchApi('/inventory/admin');
+      setVehicles(data);
+    } catch (err: any) {
+      console.error('Failed to delete vehicle:', err);
+      alert('Failed to delete vehicle. Please try again.');
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const available = vehicles.filter(v => v.status === 'Available').length;
   const reserved = vehicles.filter(v => v.status === 'Reserved').length;
@@ -163,9 +179,25 @@ export default function AdminDashboardPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <Link href={`/admin/vehicles`} className="text-gold hover:text-white transition-colors text-sm">
-                      Edit
-                    </Link>
+                    <div className="flex items-center justify-end gap-2">
+                      <Link 
+                        href={`/admin/vehicles?edit=${v.id}`} 
+                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-gold hover:text-black text-gray-400 flex items-center justify-center transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Link>
+                      <button 
+                        onClick={() => handleDelete(v.id)}
+                        disabled={deleting === v.id}
+                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-red-500 text-gray-400 hover:text-white flex items-center justify-center transition-colors disabled:opacity-50"
+                        title="Delete"
+                      >
+                        {deleting === v.id
+                          ? <span className="animate-spin rounded-full h-3 w-3 border-t-2 border-white"></span>
+                          : <Trash2 className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

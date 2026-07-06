@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Pencil, Trash2, Plus, X, Save, CarFront, Camera, Image, Video, Film, ArrowUpDown, Search } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 import {
@@ -98,6 +99,7 @@ function CheckboxGroup({ label, options, selected, onChange }: {
 }
 
 export default function AdminVehiclesPage() {
+  const searchParams = useSearchParams();
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -137,6 +139,17 @@ export default function AdminVehiclesPage() {
   }
 
   useEffect(() => { loadVehicles(); }, []);
+
+  // Handle direct edit from URL parameter
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (editId && vehicles.length > 0) {
+      const vehicle = vehicles.find(v => v.id === parseInt(editId));
+      if (vehicle) {
+        openEditForm(vehicle);
+      }
+    }
+  }, [searchParams, vehicles]);
 
   useEffect(() => {
     async function loadTrims() {
