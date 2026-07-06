@@ -9,9 +9,15 @@ const router = Router();
 const supabaseUrl = process.env.SUPABASE_URL || process.env.DATABASE_URL?.replace('postgresql://', 'https://').split('@')[0] + '.supabase.co';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
+console.log('Supabase URL:', supabaseUrl ? 'SET' : 'NOT SET');
+console.log('Supabase Key:', supabaseKey ? 'SET' : 'NOT SET');
+
 let supabase: any = null;
 if (supabaseUrl && supabaseKey) {
   supabase = createClient(supabaseUrl, supabaseKey);
+  console.log('Supabase client initialized successfully');
+} else {
+  console.log('Supabase client NOT initialized - missing credentials');
 }
 
 // Use memory storage for Supabase upload
