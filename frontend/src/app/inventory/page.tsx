@@ -59,7 +59,16 @@ function CarDetail({ id }: { id: string }) {
     );
   }
 
-  const images = car.images && car.images.length > 0 ? car.images : [car.image].filter(Boolean);
+  // Parse images from JSON string in database
+  let imageArray: string[] = [];
+  if (car.images) {
+    try {
+      imageArray = typeof car.images === 'string' ? JSON.parse(car.images) : car.images;
+    } catch (e) {
+      imageArray = [];
+    }
+  }
+  const images = imageArray && imageArray.length > 0 ? imageArray : [car.image].filter(Boolean);
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
