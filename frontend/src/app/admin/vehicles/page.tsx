@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pencil, Trash2, Plus, X, Save, CarFront, Camera, Image, Video, Film } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
-import { supabase, baseUrl, supabaseAnonKey } from '@/lib/supabase';
-import * as tus from 'tus-js-client';
 
 import {
   BRANDS, getModels, getYears,
@@ -262,105 +260,46 @@ export default function AdminVehiclesPage() {
     }
   };
 
-  // Upload multiple files directly to Supabase Storage using TUS for progress and chunking
   const handleMediaFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setMediaUploading(true);
 
     const fileArray = Array.from(files);
-    const total = fileArray.length;
-    let completed = 0;
-    const newImages: string[] = [];
-    const newVideos: string[] = [];
+    setMediaUploading(true);
+    setUploadProgress(`Uploading ${fileArray.length} file(s) to server...`);
 
-    const formatTime = (secs: number) => {
-      if (!isFinite(secs) || secs < 0) return 'calculating...';
-      if (secs < 60) return `${Math.ceil(secs)}s`;
-      const m = Math.floor(secs / 60);
-      const s = Math.ceil(secs % 60);
-      return `${m}m ${s}s`;
-    };
+    try {
+      const formData = new FormData();
+      fileArray.forEach((file) => formData.append('media', file));
 
-    setUploadProgress(`Preparing ${total} file(s)...`);
-
-    await Promise.all(fileArray.map((file) => new Promise<void>((resolve, reject) => {
-      const isVideo = file.type.startsWith('video/');
-      const folder = isVideo ? 'videos' : 'images';
-      const uniqueName = `${folder}/${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.name}`;
-      const startTime = Date.now();
-      
-      const upload = new tus.Upload(file, {
-        endpoint: `${baseUrl}/storage/v1/upload/resumable`,
-        retryDelays: [0, 3000, 5000, 10000, 20000],
-        headers: {
-          authorization: `Bearer ${supabaseAnonKey}`,
-          'x-upsert': 'true',
-        },
-        uploadDataDuringCreation: true,
-        removeFingerprintOnSuccess: true,
-        metadata: {
-          bucketName: 'vehicles',
-          objectName: uniqueName,
-          contentType: file.type,
-          cacheControl: '3600',
-        },
-        chunkSize: 6 * 1024 * 1024, // 6MB chunks
-        onError: function (error) {
-          console.error('TUS upload error:', error);
-          // If it's a 400 or 413 error, it's likely a size limit issue
-          if (error.message.includes('400') || error.message.includes('413') || error.message.includes('size')) {
-            alert('Upload failed: File is too large! Please increase the "Maximum file size" limit in your Supabase Dashboard under Storage -> vehicles bucket settings.');
-          }
-          reject(error);
-        },
-        onProgress: function (bytesUploaded, bytesTotal) {
-          const percent = Math.round((bytesUploaded / bytesTotal) * 100);
-          const elapsed = Math.max((Date.now() - startTime) / 1000, 0.1);
-          const speed = bytesUploaded / elapsed;
-          const remaining = (bytesTotal - bytesUploaded) / speed;
-          
-          setUploadProgress(
-            total === 1
-              ? `Uploading... ${percent}% (${formatTime(remaining)} left)`
-              : `Uploading file ${completed + 1}/${total} — ${percent}% (${formatTime(remaining)} left)`
-          );
-        },
-        onSuccess: function () {
-          const { data: { publicUrl } } = supabase.storage
-            .from('vehicles')
-            .getPublicUrl(uniqueName);
-
-          if (isVideo) newVideos.push(publicUrl);
-          else newImages.push(publicUrl);
-          
-          completed++;
-          setUploadProgress(`✓ ${completed}/${total} uploaded`);
-          resolve();
-        }
+      const result = await fetchApi('/upload', {
+        method: 'POST',
+        body: formData,
       });
 
-      // Start the upload
-      upload.start();
-    }))).catch((err) => {
-      setMediaUploading(false);
+      const uploadedFiles = result.files || [];
+      const newImages = uploadedFiles
+        .filter((file: any) => file.type === 'image')
+        .map((file: any) => file.url);
+      const newVideos = uploadedFiles
+        .filter((file: any) => file.type === 'video')
+        .map((file: any) => file.url);
+
+      setForm(prev => ({
+        ...prev,
+        image: prev.image || newImages[0] || '',
+        images: [...prev.images, ...newImages],
+        videos: [...prev.videos, ...newVideos],
+      }));
+
+      setUploadProgress(`✓ ${uploadedFiles.length} file(s) uploaded successfully`);
+      setTimeout(() => setUploadProgress(''), 3000);
+    } catch (err: any) {
+      console.error('Media upload failed:', err);
       setUploadProgress('');
       alert(`Upload failed: ${err.message || String(err)}`);
-      return;
-    });
-
-    setForm(prev => {
-      const updatedImages = [...prev.images, ...newImages];
-      const updatedVideos = [...prev.videos, ...newVideos];
-      return {
-        ...prev,
-        image: prev.image || updatedImages[0] || '',
-        images: updatedImages,
-        videos: updatedVideos,
-      };
-    });
-    setMediaUploading(false);
-    setUploadProgress(`✓ ${total} file(s) uploaded successfully`);
-    setTimeout(() => setUploadProgress(''), 3000);
+    } finally {
+      setMediaUploading(false);
+    }
   };
 
   const removeImage = (idx: number) => {
