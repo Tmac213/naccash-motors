@@ -239,10 +239,10 @@ export default function AdminVehiclesPage() {
     const formData = new FormData();
     Array.from(files).forEach(f => formData.append('media', f));
     const token = localStorage.getItem('token');
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://naccashmotors-api.onrender.com/api';
 
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${API_URL}/api/upload`);
+    xhr.open('POST', `${API_URL}/upload`);
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
     const startTime = Date.now();
