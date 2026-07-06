@@ -5,7 +5,11 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:frontend": "cd frontend && npm run dev",
-    "dev:backend": "cd backend && npm run dev"
+    "dev:backend": "cd backend && npm run dev",
+    "deploy": "npm run deploy:firebase",
+    "deploy:firebase": "cd frontend && npm run build && firebase deploy",
+    "firebase:init": "firebase init",
+    "firebase:login": "firebase login"
   },
   "devDependencies": {
     "@prisma/client": "^5.22.0",
