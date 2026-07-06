@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pencil, Trash2, Plus, X, Save, CarFront, Camera, Image, Video, Film } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
-import { supabase } from '@/lib/supabase';
+import { supabase, baseUrl, supabaseAnonKey } from '@/lib/supabase';
+import * as tus from 'tus-js-client';
 
 import {
   BRANDS, getModels, getYears,
@@ -261,7 +262,7 @@ export default function AdminVehiclesPage() {
     }
   };
 
-  // Upload multiple files directly to Supabase Storage
+  // Upload multiple files directly to Supabase Storage using TUS for progress and chunking
   const handleMediaFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setMediaUploading(true);
@@ -272,41 +273,71 @@ export default function AdminVehiclesPage() {
     const newImages: string[] = [];
     const newVideos: string[] = [];
 
+    const formatTime = (secs: number) => {
+      if (!isFinite(secs) || secs < 0) return 'calculating...';
+      if (secs < 60) return `${Math.ceil(secs)}s`;
+      const m = Math.floor(secs / 60);
+      const s = Math.ceil(secs % 60);
+      return `${m}m ${s}s`;
+    };
+
     setUploadProgress(`Preparing ${total} file(s)...`);
 
-    await Promise.all(fileArray.map(async (file) => {
+    await Promise.all(fileArray.map((file) => new Promise<void>((resolve, reject) => {
       const isVideo = file.type.startsWith('video/');
       const folder = isVideo ? 'videos' : 'images';
       const uniqueName = `${folder}/${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.name}`;
+      const startTime = Date.now();
       
-      try {
-        setUploadProgress(total === 1 ? `Uploading...` : `Uploading file ${completed + 1}/${total}...`);
-        
-        const { data, error } = await supabase.storage
-          .from('vehicles')
-          .upload(uniqueName, file, {
-            cacheControl: '3600',
-            upsert: false
-          });
+      const upload = new tus.Upload(file, {
+        endpoint: `${baseUrl}/storage/v1/upload/resumable`,
+        retryDelays: [0, 3000, 5000, 10000, 20000],
+        headers: {
+          authorization: `Bearer ${supabaseAnonKey}`,
+          'x-upsert': 'true',
+        },
+        uploadDataDuringCreation: true,
+        removeFingerprintOnSuccess: true,
+        metadata: {
+          bucketName: 'vehicles',
+          objectName: uniqueName,
+          contentType: file.type,
+          cacheControl: '3600',
+        },
+        chunkSize: 6 * 1024 * 1024, // 6MB chunks
+        onError: function (error) {
+          console.error('TUS upload error:', error);
+          reject(error);
+        },
+        onProgress: function (bytesUploaded, bytesTotal) {
+          const percent = Math.round((bytesUploaded / bytesTotal) * 100);
+          const elapsed = (Date.now() - startTime) / 1000;
+          const speed = bytesUploaded / elapsed;
+          const remaining = (bytesTotal - bytesUploaded) / speed;
+          
+          setUploadProgress(
+            total === 1
+              ? `Uploading... ${percent}% (${formatTime(remaining)} left)`
+              : `Uploading file ${completed + 1}/${total} — ${percent}% (${formatTime(remaining)} left)`
+          );
+        },
+        onSuccess: function () {
+          const { data: { publicUrl } } = supabase.storage
+            .from('vehicles')
+            .getPublicUrl(uniqueName);
 
-        if (error) {
-          throw error;
+          if (isVideo) newVideos.push(publicUrl);
+          else newImages.push(publicUrl);
+          
+          completed++;
+          setUploadProgress(`✓ ${completed}/${total} uploaded`);
+          resolve();
         }
+      });
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('vehicles')
-          .getPublicUrl(data.path);
-
-        if (isVideo) newVideos.push(publicUrl);
-        else newImages.push(publicUrl);
-        
-        completed++;
-        setUploadProgress(`✓ ${completed}/${total} uploaded`);
-      } catch (err: any) {
-        console.error('Supabase upload error:', err);
-        throw err;
-      }
-    })).catch((err) => {
+      // Start the upload
+      upload.start();
+    }))).catch((err) => {
       setMediaUploading(false);
       setUploadProgress('');
       alert(`Upload failed: ${err.message || String(err)}`);

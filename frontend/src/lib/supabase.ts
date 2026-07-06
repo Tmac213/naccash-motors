@@ -8,6 +8,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Supabase expects the base URL without /rest/v1/
-const baseUrl = supabaseUrl.replace('/rest/v1/', '').replace('/rest/v1', '');
+export const baseUrl = supabaseUrl.replace('/rest/v1/', '').replace('/rest/v1', '');
+export { supabaseAnonKey };
 
 export const supabase = createClient(baseUrl, supabaseAnonKey);
