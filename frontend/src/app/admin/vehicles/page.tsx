@@ -307,11 +307,15 @@ export default function AdminVehiclesPage() {
         chunkSize: 6 * 1024 * 1024, // 6MB chunks
         onError: function (error) {
           console.error('TUS upload error:', error);
+          // If it's a 400 or 413 error, it's likely a size limit issue
+          if (error.message.includes('400') || error.message.includes('413') || error.message.includes('size')) {
+            alert('Upload failed: File is too large! Please increase the "Maximum file size" limit in your Supabase Dashboard under Storage -> vehicles bucket settings.');
+          }
           reject(error);
         },
         onProgress: function (bytesUploaded, bytesTotal) {
           const percent = Math.round((bytesUploaded / bytesTotal) * 100);
-          const elapsed = (Date.now() - startTime) / 1000;
+          const elapsed = Math.max((Date.now() - startTime) / 1000, 0.1);
           const speed = bytesUploaded / elapsed;
           const remaining = (bytesTotal - bytesUploaded) / speed;
           
