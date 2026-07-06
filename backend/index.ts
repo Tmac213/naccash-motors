@@ -21,7 +21,9 @@ app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
 // Serve uploaded images statically
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Handle both ts-node (development) and compiled builds (production)
+const uploadsPath = path.resolve(__dirname, '..', 'uploads');
+app.use('/uploads', express.static(uploadsPath));
 
 // Routes
 app.use('/api/auth', authRoutes);
