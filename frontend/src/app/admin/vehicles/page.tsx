@@ -300,6 +300,15 @@ export default function AdminVehiclesPage() {
         } catch (e) {
           if (xhr.status === 413) errMsg = 'File is too large! (Error 413: Payload Too Large). Check if the file size exceeds the server or Cloudinary limits.';
         }
+        
+        // Handle authentication errors
+        if (xhr.status === 401 || xhr.status === 403 || errMsg.includes('token')) {
+          alert('Your session has expired. Please log out and log back in to continue.');
+          localStorage.removeItem('token');
+          window.location.href = '/admin/login';
+          return;
+        }
+        
         alert(errMsg);
       }
     };
