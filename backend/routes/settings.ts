@@ -16,9 +16,12 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       // Create default settings if not exists
       settings = await prisma.settings.create({
         data: {
-          whatsappNumber: '',
+          whatsappNumber: '+96181877675',
           instagramUrl: '',
-          tiktokUrl: ''
+          tiktokUrl: '',
+          email: 'info@naccashmotors.com',
+          phoneNumber: '+961 81 877 675',
+          address: 'Lebanon'
         }
       });
     }
@@ -33,7 +36,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 // Update settings (Admin only)
 router.put('/', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const { whatsappNumber, instagramUrl, tiktokUrl, email, phoneNumber, address, aboutUsText } = req.body;
+    const { whatsappNumber, instagramUrl, tiktokUrl, facebookUrl, email, phoneNumber, address, aboutUsText } = req.body;
 
     const updatedSettings = await prisma.settings.upsert({
       where: { id: 1 },
@@ -41,6 +44,7 @@ router.put('/', authenticateToken, async (req: Request, res: Response) => {
         whatsappNumber,
         instagramUrl,
         tiktokUrl,
+        facebookUrl,
         email,
         phoneNumber,
         address,
@@ -51,6 +55,7 @@ router.put('/', authenticateToken, async (req: Request, res: Response) => {
         whatsappNumber,
         instagramUrl,
         tiktokUrl,
+        facebookUrl,
         email,
         phoneNumber,
         address,

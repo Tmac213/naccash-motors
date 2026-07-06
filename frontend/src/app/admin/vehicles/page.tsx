@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { Pencil, Trash2, Plus, X, Save, CarFront, Camera, Image, Video, Film } from 'lucide-react';
+import { Pencil, Trash2, Plus, X, Save, CarFront, Camera, Image, Video, Film, ArrowUpDown, Search } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 import {
   BRANDS, getModels, getYears,
@@ -113,6 +113,11 @@ export default function AdminVehiclesPage() {
   const [loadingTrims, setLoadingTrims] = useState(false);
   const mediaInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Search and sort state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortColumn, setSortColumn] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const set = (key: keyof FormState) => (value: any) => setForm(prev => ({ ...prev, [key]: value }));
 
@@ -397,6 +402,45 @@ export default function AdminVehiclesPage() {
     }
   };
 
+  // Search and sort logic
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const filteredAndSortedVehicles = vehicles
+    .filter(v => {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        v.brand?.toLowerCase().includes(searchLower) ||
+        v.model?.toLowerCase().includes(searchLower) ||
+        String(v.year).includes(searchLower) ||
+        v.status?.toLowerCase().includes(searchLower) ||
+        v.price?.toString().includes(searchLower)
+      );
+    })
+    .sort((a, b) => {
+      if (!sortColumn) return 0;
+      let aVal = a[sortColumn];
+      let bVal = b[sortColumn];
+
+      // Handle null/undefined
+      if (aVal == null) aVal = '';
+      if (bVal == null) bVal = '';
+
+      // Convert to string for comparison
+      aVal = String(aVal).toLowerCase();
+      bVal = String(bVal).toLowerCase();
+
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
   return (
     <div>
       {/* Header */}
@@ -413,27 +457,59 @@ export default function AdminVehiclesPage() {
 
       {/* Vehicle Table */}
       <div className="bg-dark-card border border-white/10 rounded-xl overflow-hidden">
+        {/* Search Bar */}
+        <div className="p-4 border-b border-white/10">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search vehicles..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-dark-bg border border-white/20 text-white pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:border-gold transition-colors"
+            />
+          </div>
+        </div>
+
         {loading ? (
           <div className="p-12 flex justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold"></div>
           </div>
-        ) : vehicles.length === 0 ? (
+        ) : filteredAndSortedVehicles.length === 0 ? (
           <div className="p-12 text-center">
             <CarFront className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-500 mb-4">No vehicles yet.</p>
+            <p className="text-gray-500 mb-4">{searchTerm ? 'No vehicles match your search.' : 'No vehicles yet.'}</p>
             <button onClick={openAddForm} className="text-gold hover:text-white transition-colors">Add your first vehicle →</button>
           </div>
         ) : (
           <table className="w-full">
             <thead>
               <tr className="border-b border-white/10">
-                {['Vehicle', 'Year', 'Price', 'Fuel', 'Status', ''].map(h => (
-                  <th key={h} className={`text-left text-xs uppercase tracking-wider text-gray-500 px-5 py-4 ${h === 'Year' || h === 'Fuel' ? 'hidden lg:table-cell' : ''}`}>{h}</th>
+                {[
+                  { key: 'brand', label: 'Vehicle' },
+                  { key: 'year', label: 'Year' },
+                  { key: 'price', label: 'Price' },
+                  { key: 'fuelType', label: 'Fuel' },
+                  { key: 'status', label: 'Status' },
+                  { key: '', label: '' }
+                ].map(({ key, label }) => (
+                  <th
+                    key={key}
+                    onClick={() => key && handleSort(key)}
+                    className={`text-left text-xs uppercase tracking-wider text-gray-500 px-5 py-4 cursor-pointer hover:text-white transition-colors ${label === 'Year' || label === 'Fuel' ? 'hidden lg:table-cell' : ''} ${key ? 'select-none' : ''}`}
+                  >
+                    <div className="flex items-center gap-1">
+                      {label}
+                      {key && (
+                        <ArrowUpDown className={`w-3 h-3 ${sortColumn === key ? 'text-gold' : 'text-gray-600'}`} />
+                      )}
+                    </div>
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {vehicles.map(v => (
+              {filteredAndSortedVehicles.map(v => (
                 <tr key={v.id} className="hover:bg-white/5 transition-colors group">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">

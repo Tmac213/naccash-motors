@@ -9,6 +9,7 @@ export default function AdminSettingsPage() {
     whatsappNumber: '',
     instagramUrl: '',
     tiktokUrl: '',
+    facebookUrl: '',
     email: '',
     phoneNumber: '',
     address: '',
@@ -28,6 +29,7 @@ export default function AdminSettingsPage() {
             whatsappNumber: data.whatsappNumber || '',
             instagramUrl: data.instagramUrl || '',
             tiktokUrl: data.tiktokUrl || '',
+            facebookUrl: data.facebookUrl || '',
             email: data.email || '',
             phoneNumber: data.phoneNumber || '',
             address: data.address || '',
@@ -160,6 +162,17 @@ export default function AdminSettingsPage() {
                 onChange={(e) => setForm({ ...form, tiktokUrl: e.target.value })}
                 className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-gold transition-colors"
                 placeholder="https://tiktok.com/@yourpage"
+              />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Facebook URL</label>
+              <input
+                type="url"
+                id="facebook"
+                value={form.facebookUrl}
+                onChange={(e) => setForm({ ...form, facebookUrl: e.target.value })}
+                className="w-full bg-dark-bg border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-gold transition-colors"
+                placeholder="https://facebook.com/yourpage"
               />
             </div>
           </div>

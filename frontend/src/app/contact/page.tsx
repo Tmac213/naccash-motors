@@ -1,11 +1,15 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { MapPin, Phone, Mail, Clock, Share2 } from 'lucide-react';
+import { MapPin, Phone, Mail, Clock, Share2, Send } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 
 export default function ContactPage() {
   const [settings, setSettings] = useState<any>(null);
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', message: '' });
+  const [sending, setSending] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadSettings() {
@@ -18,6 +22,27 @@ export default function ContactPage() {
     }
     loadSettings();
   }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSending(true);
+    setSuccess(false);
+    setError(null);
+
+    try {
+      await fetchApi('/contact', {
+        method: 'POST',
+        body: JSON.stringify(form),
+      });
+      setSuccess(true);
+      setForm({ firstName: '', lastName: '', email: '', message: '' });
+      setTimeout(() => setSuccess(false), 5000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to send inquiry. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -74,35 +99,81 @@ export default function ContactPage() {
                 Follow us on TikTok
               </a>
             )}
-            {!settings?.instagramUrl && !settings?.tiktokUrl && (
+            {settings?.facebookUrl && (
+              <a href={settings.facebookUrl} target="_blank" rel="noreferrer" className="block text-gray-400 text-sm hover:text-gold">
+                Follow us on Facebook
+              </a>
+            )}
+            {!settings?.instagramUrl && !settings?.tiktokUrl && !settings?.facebookUrl && (
               <p className="text-gray-400 text-sm">Follow us on our social platforms</p>
             )}
           </div>
         </div>
 
         {/* Form */}
-        <form className="space-y-6 bg-dark-card p-8 border border-white/10 rounded">
+        <form onSubmit={handleSubmit} className="space-y-6 bg-dark-card p-8 border border-white/10 rounded">
           <h3 className="text-2xl font-bold text-white mb-6 uppercase tracking-wider">Send an Inquiry</h3>
+          {success && (
+            <div className="bg-green-900/30 border border-green-500/50 text-green-400 rounded-lg px-4 py-3 text-sm">
+              ✓ Inquiry sent successfully!
+            </div>
+          )}
+          {error && (
+            <div className="bg-red-900/30 border border-red-500/50 text-red-400 rounded-lg px-4 py-3 text-sm">{error}</div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">First Name</label>
-              <input type="text" className="w-full bg-dark-bg border border-white/20 text-white px-4 py-3 focus:outline-none focus:border-gold" />
+              <input
+                type="text"
+                value={form.firstName}
+                onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                required
+                className="w-full bg-dark-bg border border-white/20 text-white px-4 py-3 focus:outline-none focus:border-gold"
+              />
             </div>
             <div>
               <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Last Name</label>
-              <input type="text" className="w-full bg-dark-bg border border-white/20 text-white px-4 py-3 focus:outline-none focus:border-gold" />
+              <input
+                type="text"
+                value={form.lastName}
+                onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                required
+                className="w-full bg-dark-bg border border-white/20 text-white px-4 py-3 focus:outline-none focus:border-gold"
+              />
             </div>
           </div>
           <div>
             <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Email Address</label>
-            <input type="email" className="w-full bg-dark-bg border border-white/20 text-white px-4 py-3 focus:outline-none focus:border-gold" />
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              required
+              className="w-full bg-dark-bg border border-white/20 text-white px-4 py-3 focus:outline-none focus:border-gold"
+            />
           </div>
           <div>
             <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Message</label>
-            <textarea rows={4} className="w-full bg-dark-bg border border-white/20 text-white px-4 py-3 focus:outline-none focus:border-gold"></textarea>
+            <textarea
+              rows={4}
+              value={form.message}
+              onChange={(e) => setForm({ ...form, message: e.target.value })}
+              required
+              className="w-full bg-dark-bg border border-white/20 text-white px-4 py-3 focus:outline-none focus:border-gold resize-none"
+            />
           </div>
-          <button type="submit" className="w-full bg-gold text-black font-bold uppercase tracking-wider py-4 hover:bg-gold-hover transition-colors">
-            Submit Inquiry
+          <button
+            type="submit"
+            disabled={sending}
+            className="w-full bg-gold text-black font-bold uppercase tracking-wider py-4 hover:bg-gold-hover transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {sending ? (
+              <span className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-black"></span>
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+            {sending ? 'Sending...' : 'Submit Inquiry'}
           </button>
         </form>
       </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Filter, Search, ChevronLeft, ChevronRight, MessageCircle, Settings, Gauge, Calendar, ShieldCheck, Fuel, Cog, Disc3, Palette } from 'lucide-react';
+import { Filter, Search, ChevronLeft, ChevronRight, MessageCircle, Settings, Gauge, Calendar, ShieldCheck, Fuel, Cog, Disc3, Palette, Video, Play } from 'lucide-react';
 import Link from 'next/link';
 import { fetchApi } from '@/lib/api';
 
@@ -70,6 +70,16 @@ function CarDetail({ id }: { id: string }) {
   }
   const images = imageArray && imageArray.length > 0 ? imageArray : [car.image].filter(Boolean);
 
+  // Parse videos from JSON string in database
+  let videoArray: string[] = [];
+  if (car.videos) {
+    try {
+      videoArray = typeof car.videos === 'string' ? JSON.parse(car.videos) : car.videos;
+    } catch (e) {
+      videoArray = [];
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
@@ -130,6 +140,28 @@ function CarDetail({ id }: { id: string }) {
                     <img src={img} alt="" className="w-full h-full object-cover" />
                   </button>
                 ))}
+              </div>
+            )}
+
+            {/* Videos Section */}
+            {videoArray.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold uppercase tracking-wider">
+                  <Video className="w-4 h-4" />
+                  Videos ({videoArray.length})
+                </div>
+                <div className="space-y-3">
+                  {videoArray.map((videoUrl: string, idx: number) => (
+                    <div key={idx} className="relative rounded-xl overflow-hidden bg-black/30 border border-white/10">
+                      <video
+                        src={videoUrl}
+                        controls
+                        className="w-full aspect-video object-contain"
+                        preload="metadata"
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -195,7 +227,7 @@ function CarDetail({ id }: { id: string }) {
 
             <div className="flex gap-4 pt-2">
               <a
-                href={`https://wa.me/${settings?.whatsappNumber?.replace(/\+/g, '') || '1234567890'}?text=I'm interested in the ${car.year} ${car.brand} ${car.model}`}
+                href={`https://wa.me/${settings?.whatsappNumber?.replace(/[^0-9]/g, '') || '1234567890'}?text=${encodeURIComponent(`I'm interested in the ${car.year} ${car.brand} ${car.model}`)}`}
                 target="_blank" rel="noopener noreferrer"
                 className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-6 rounded-xl transition-colors duration-200"
               >
@@ -218,11 +250,14 @@ function CarDetail({ id }: { id: string }) {
 ───────────────────────────────────────────── */
 function InventoryList() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showFilter, setShowFilter] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
+  const [brandFilter, setBrandFilter] = useState('');
+  const [modelFilter, setModelFilter] = useState('');
 
   useEffect(() => {
     async function loadVehicles() {
@@ -238,13 +273,23 @@ function InventoryList() {
     loadVehicles();
   }, []);
 
+  // Read URL parameters on mount
+  useEffect(() => {
+    const brand = searchParams.get('brand');
+    const model = searchParams.get('model');
+    if (brand) setBrandFilter(brand);
+    if (model) setModelFilter(model);
+  }, [searchParams]);
+
   const filtered = vehicles.filter((car: any) => {
     const q = search.toLowerCase();
     const matchesSearch = car.brand?.toLowerCase().includes(q) ||
                           car.model?.toLowerCase().includes(q) ||
                           String(car.year).includes(q);
     const matchesStatus = statusFilter === '' || car.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesBrand = brandFilter === '' || car.brand === brandFilter;
+    const matchesModel = modelFilter === '' || car.model === modelFilter;
+    return matchesSearch && matchesStatus && matchesBrand && matchesModel;
   });
 
   return (
@@ -255,17 +300,17 @@ function InventoryList() {
           <div className="w-24 h-1 bg-gold"></div>
         </div>
         <div className="flex gap-4 w-full md:w-auto">
-          <div className="flex flex-col md:flex-none">
-            <button 
+          <div className="relative flex flex-col md:flex-none">
+            <button
               onClick={() => setShowFilter(!showFilter)}
               className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-dark-card border border-white/20 text-white px-6 py-3 hover:border-gold transition-colors">
               <Filter className="w-4 h-4" /> Filter
             </button>
             {showFilter && (
-              <div className="absolute mt-14 z-20 bg-dark-card border border-white/20 p-4 rounded-lg shadow-xl w-48">
+              <div className="absolute top-full mt-2 z-20 bg-dark-card border border-white/20 p-4 rounded-lg shadow-xl w-48">
                 <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Status</label>
-                <select 
-                  value={statusFilter} 
+                <select
+                  value={statusFilter}
                   onChange={e => setStatusFilter(e.target.value)}
                   className="w-full bg-dark-bg border border-white/20 text-white rounded px-3 py-2 focus:outline-none focus:border-gold"
                 >
@@ -273,6 +318,7 @@ function InventoryList() {
                   <option value="Available">Available</option>
                   <option value="Reserved">Reserved</option>
                   <option value="Coming Soon">Coming Soon</option>
+                  <option value="Sold Out">Sold Out</option>
                 </select>
               </div>
             )}

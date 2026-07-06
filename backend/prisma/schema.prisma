@@ -65,6 +65,7 @@ model Settings {
   whatsappNumber String?
   instagramUrl   String?
   tiktokUrl      String?
+  facebookUrl    String?
   email          String?
   phoneNumber    String?
   address        String?

@@ -41,6 +41,8 @@
     "ts-node": "^10.9.2"
   },
   "devDependencies": {
+    "@types/nodemailer": "^8.0.1",
+    "nodemailer": "^9.0.3",
     "typescript": "^5.9.3"
   }
 }

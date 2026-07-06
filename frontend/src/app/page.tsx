@@ -15,8 +15,12 @@ export default function Home() {
     async function loadLatest() {
       try {
         const data = await fetchApi('/inventory');
+        // Only show Available and Coming Soon vehicles, exclude Hidden and Sold Out
+        const availableVehicles = data.filter((v: any) => 
+          v.status === 'Available' || v.status === 'Coming Soon'
+        );
         // Only show up to 3 cars on home page
-        setLatestVehicles(data.slice(0, 3));
+        setLatestVehicles(availableVehicles.slice(0, 3));
       } catch (error) {
         console.error('Failed to load latest vehicles:', error);
       } finally {

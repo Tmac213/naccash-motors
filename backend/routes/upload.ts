@@ -102,7 +102,11 @@ router.post('/', authenticateToken, (req: Request, res: Response, next: express.
     return;
   }
 
-  const API_URL = process.env.API_URL || 'http://localhost:5000';
+  const API_URL =
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.API_URL ||
+    'http://localhost:5000';
+
 
   const urls = files.map(file => {
     let url = '';
