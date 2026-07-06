@@ -3,10 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pencil, Trash2, Plus, X, Save, CarFront, Camera, Image, Video, Film } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
-import app from '@/lib/firebase';
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { supabase } from '@/lib/supabase';
 
-const firebaseStorage = getStorage(app);
 import {
   BRANDS, getModels, getYears,
   FUEL_TYPES, DRIVETRAINS, TRANSMISSIONS, ENGINE_CAPACITIES,
@@ -263,7 +261,7 @@ export default function AdminVehiclesPage() {
     }
   };
 
-  // Upload multiple files directly to Firebase Storage with progress tracking
+  // Upload multiple files directly to Supabase Storage
   const handleMediaFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setMediaUploading(true);
@@ -274,51 +272,41 @@ export default function AdminVehiclesPage() {
     const newImages: string[] = [];
     const newVideos: string[] = [];
 
-    const formatTime = (secs: number) => {
-      if (!isFinite(secs) || secs < 0) return 'calculating...';
-      if (secs < 60) return `${Math.ceil(secs)}s`;
-      const m = Math.floor(secs / 60);
-      const s = Math.ceil(secs % 60);
-      return `${m}m ${s}s`;
-    };
-
     setUploadProgress(`Preparing ${total} file(s)...`);
 
-    await Promise.all(fileArray.map((file) => new Promise<void>((resolve, reject) => {
+    await Promise.all(fileArray.map(async (file) => {
       const isVideo = file.type.startsWith('video/');
-      const folder = isVideo ? 'vehicles/videos' : 'vehicles/images';
-      const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.name}`;
-      const storageRef = ref(firebaseStorage, `${folder}/${uniqueName}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
-      const startTime = Date.now();
+      const folder = isVideo ? 'videos' : 'images';
+      const uniqueName = `${folder}/${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.name}`;
+      
+      try {
+        setUploadProgress(total === 1 ? `Uploading...` : `Uploading file ${completed + 1}/${total}...`);
+        
+        const { data, error } = await supabase.storage
+          .from('vehicles')
+          .upload(uniqueName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
 
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const percent = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-          const elapsed = (Date.now() - startTime) / 1000;
-          const speed = snapshot.bytesTransferred / elapsed;
-          const remaining = (snapshot.totalBytes - snapshot.bytesTransferred) / speed;
-          setUploadProgress(
-            total === 1
-              ? `Uploading... ${percent}% (${formatTime(remaining)} left)`
-              : `Uploading file ${completed + 1}/${total} — ${percent}% (${formatTime(remaining)} left)`
-          );
-        },
-        (error) => {
-          console.error('Firebase upload error:', error);
-          reject(error);
-        },
-        async () => {
-          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-          if (isVideo) newVideos.push(downloadUrl);
-          else newImages.push(downloadUrl);
-          completed++;
-          setUploadProgress(`✓ ${completed}/${total} uploaded`);
-          resolve();
+        if (error) {
+          throw error;
         }
-      );
-    }))).catch((err) => {
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('vehicles')
+          .getPublicUrl(data.path);
+
+        if (isVideo) newVideos.push(publicUrl);
+        else newImages.push(publicUrl);
+        
+        completed++;
+        setUploadProgress(`✓ ${completed}/${total} uploaded`);
+      } catch (err: any) {
+        console.error('Supabase upload error:', err);
+        throw err;
+      }
+    })).catch((err) => {
       setMediaUploading(false);
       setUploadProgress('');
       alert(`Upload failed: ${err.message || String(err)}`);
