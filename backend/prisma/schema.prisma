@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+}
+
+model Vehicle {
+  id              Int      @id @default(autoincrement())
+  vin             String?
+  brand           String
+  year            Int
+  model           String
+  trim            String?
+  transmission    String?
+  status          String   @default("Available") // Available, Reserved, Sold Out, Hidden
+  mileage         Int?
+  condition       String?
+  price           Float?
+  description     String?
+  image           String?
+  images          String? // JSON array of image URLs
+  videos          String? // JSON array of video URLs
+  // Engine & Performance
+  fuelType        String?
+  engineCapacity  String?
+  drivetrain      String?
+  // Aesthetics & Styling
+  exteriorColor   String?
+  interiorColor   String?
+  bodyType        String?
+  // Ownership & Legal
+  numberOfOwners  String?
+  keys            String?
+  regionalSpecs   String?
+  // Premium Features
+  sunroof         String?
+  lighting        String?
+  specialPackages String? // JSON array stored as string
+  techFeatures    String? // JSON array stored as string
+  // Accounting & Financials
+  purchaseCost    Float?
+  shippingCost    Float?
+  customsCost     Float?
+  maintenanceCost Float?
+  otherCosts      Float?
+  soldPrice       Float?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+
+model Settings {
+  id             Int      @id @default(1)
+  whatsappNumber String?
+  instagramUrl   String?
+  tiktokUrl      String?
+  email          String?
+  phoneNumber    String?
+  address        String?
+  aboutUsText    String?
+  updatedAt      DateTime @updatedAt
+}
