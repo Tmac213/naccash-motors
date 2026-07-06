@@ -127,7 +127,7 @@ router.post('/', authenticateToken, (req: Request, res: Response, next: express.
       }
     }
     
-    res.status(500).json({ error: `Failed to upload to cloud: ${error.message || String(error)}` });
+    res.status(400).json({ error: `Cloudinary error: ${error.message || String(error)}` });
   }
 });
 
