@@ -342,27 +342,32 @@ export default function AdminVehiclesPage() {
   };
 
   const openEditForm = (v: any) => {
-    setEditingId(v.id);
-    setForm({
-      vin: v.vin || '', brand: v.brand || '', model: v.model || '', trim: v.trim || '', year: String(v.year || ''),
-      price: v.price || '', status: v.status || 'Available', condition: v.condition || 'Used',
-      mileage: v.mileage || '', description: v.description || '', image: v.image || '',
-      images: v.images ? JSON.parse(v.images) : [],
-      videos: v.videos ? JSON.parse(v.videos) : [],
-      transmission: v.transmission || '', fuelType: v.fuelType || '',
-      engineCapacity: v.engineCapacity || '', drivetrain: v.drivetrain || '',
-      exteriorColor: v.exteriorColor || '', interiorColor: v.interiorColor || '',
-      bodyType: v.bodyType || '', numberOfOwners: v.numberOfOwners || '',
-      keys: v.keys || '', regionalSpecs: v.regionalSpecs || '',
-      sunroof: v.sunroof || '', lighting: v.lighting || '',
-      specialPackages: v.specialPackages ? JSON.parse(v.specialPackages) : [],
-      techFeatures: v.techFeatures ? JSON.parse(v.techFeatures) : [],
-      purchaseCost: v.purchaseCost || '', shippingCost: v.shippingCost || '',
-      customsCost: v.customsCost || '', maintenanceCost: v.maintenanceCost || '',
-      otherCosts: v.otherCosts || '', soldPrice: v.soldPrice || '',
-    });
-    setFormError(null);
-    setShowForm(true);
+    try {
+      setEditingId(v.id);
+      setForm({
+        vin: v.vin || '', brand: v.brand || '', model: v.model || '', trim: v.trim || '', year: String(v.year || ''),
+        price: v.price || '', status: v.status || 'Available', condition: v.condition || 'Used',
+        mileage: v.mileage || '', description: v.description || '', image: v.image || '',
+        images: v.images ? (typeof v.images === 'string' ? JSON.parse(v.images) : v.images) : [],
+        videos: v.videos ? (typeof v.videos === 'string' ? JSON.parse(v.videos) : v.videos) : [],
+        transmission: v.transmission || '', fuelType: v.fuelType || '',
+        engineCapacity: v.engineCapacity || '', drivetrain: v.drivetrain || '',
+        exteriorColor: v.exteriorColor || '', interiorColor: v.interiorColor || '',
+        bodyType: v.bodyType || '', numberOfOwners: v.numberOfOwners || '',
+        keys: v.keys || '', regionalSpecs: v.regionalSpecs || '',
+        sunroof: v.sunroof || '', lighting: v.lighting || '',
+        specialPackages: v.specialPackages ? (typeof v.specialPackages === 'string' ? JSON.parse(v.specialPackages) : v.specialPackages) : [],
+        techFeatures: v.techFeatures ? (typeof v.techFeatures === 'string' ? JSON.parse(v.techFeatures) : v.techFeatures) : [],
+        purchaseCost: v.purchaseCost || '', shippingCost: v.shippingCost || '',
+        customsCost: v.customsCost || '', maintenanceCost: v.maintenanceCost || '',
+        otherCosts: v.otherCosts || '', soldPrice: v.soldPrice || '',
+      });
+      setFormError(null);
+      setShowForm(true);
+    } catch (err) {
+      console.error('Error opening edit form:', err);
+      setFormError('Failed to load vehicle data. Please try again.');
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
