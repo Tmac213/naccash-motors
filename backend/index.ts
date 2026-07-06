@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { PrismaClient } from '@prisma/client';
 import * as functions from 'firebase-functions';
 import authRoutes from './routes/auth';
@@ -9,6 +10,7 @@ import nhtsaRoutes from './routes/nhtsa';
 import inventoryRoutes from './routes/inventory';
 import settingsRoutes from './routes/settings';
 import uploadRoutes from './routes/upload';
+import contactRoutes from './routes/contact';
 
 dotenv.config();
 
@@ -22,7 +24,7 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
 // Serve uploaded images statically
 // Handle both ts-node (development) and compiled builds (production)
-const uploadsPath = path.resolve(__dirname, '..', 'uploads');
+const uploadsPath = path.join(__dirname, 'uploads');
 app.use('/uploads', express.static(uploadsPath));
 
 // Routes
@@ -31,6 +33,7 @@ app.use('/api/nhtsa', nhtsaRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/contact', contactRoutes);
 
 app.get('/', (req: Request, res: Response) => {
   res.send('Naccash Motors API is running');
