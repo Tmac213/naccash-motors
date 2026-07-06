@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { CarFront, TrendingUp, Star, Eye, ArrowRight, Plus, Pencil, Trash2 } from 'lucide-react';
+import { CarFront, TrendingUp, Star, Eye, ArrowRight, Plus, Trash2 } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 
 export default function AdminDashboardPage() {
@@ -181,11 +181,11 @@ export default function AdminDashboardPage() {
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <Link 
-                        href={`/admin/vehicles?edit=${v.id}`} 
-                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-gold hover:text-black text-gray-400 flex items-center justify-center transition-colors"
-                        title="Edit"
+                        href={`/admin/vehicles`} 
+                        className="text-gold hover:text-white transition-colors text-sm"
+                        title="View All Vehicles"
                       >
-                        <Pencil className="w-3.5 h-3.5" />
+                        Edit
                       </Link>
                       <button 
                         onClick={() => handleDelete(v.id)}
