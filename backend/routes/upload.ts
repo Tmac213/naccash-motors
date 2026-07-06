@@ -92,12 +92,23 @@ router.post('/', authenticateToken, (req: Request, res: Response, next: express.
       let finalUrl = '';
 
       if (useCloudinary) {
-        // Upload to Cloudinary using upload_large (supports chunked uploads for large videos)
-        const result = await cloudinary.uploader.upload_large(file.path, {
-          folder: 'car-dealer-uploads',
-          resource_type: isVideo ? 'video' : 'image',
-          public_id: `vehicle-${Date.now()}-${Math.round(Math.random() * 1e9)}`,
-        });
+        let result;
+        if (isVideo) {
+          // Upload to Cloudinary using upload_large for chunked large videos
+          result = await cloudinary.uploader.upload_large(file.path, {
+            folder: 'car-dealer-uploads',
+            resource_type: 'video',
+            public_id: `vehicle-${Date.now()}-${Math.round(Math.random() * 1e9)}`,
+          });
+        } else {
+          // Use standard upload for images
+          result = await cloudinary.uploader.upload(file.path, {
+            folder: 'car-dealer-uploads',
+            resource_type: 'image',
+            public_id: `vehicle-${Date.now()}-${Math.round(Math.random() * 1e9)}`,
+            transformation: [{ quality: 'auto', fetch_format: 'auto' }]
+          });
+        }
         finalUrl = result.secure_url;
         
         // Delete local temporary file
