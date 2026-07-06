@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Pencil, Trash2, Plus, X, Save, CarFront, Camera, Image, Video, Film } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 
@@ -99,8 +100,10 @@ function CheckboxGroup({ label, options, selected, onChange }: {
 }
 
 export default function AdminVehiclesPage() {
+  const router = useRouter();
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -125,6 +128,7 @@ export default function AdminVehiclesPage() {
     try {
       const data = await fetchApi('/inventory/admin');
       setVehicles(data);
+      setError(null);
       
       // Auto-edit if query param is present
       if (typeof window !== 'undefined') {
@@ -159,8 +163,14 @@ export default function AdminVehiclesPage() {
           }
         }
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.status === 401 || err?.status === 403) {
+        router.push('/admin/login');
+        return;
+      }
+      const message = err?.message || 'Failed to load vehicles.';
       console.error('Failed to load vehicles:', err);
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -410,6 +420,12 @@ export default function AdminVehiclesPage() {
         {loading ? (
           <div className="p-12 flex justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold"></div>
+          </div>
+        ) : error ? (
+          <div className="p-12 text-center text-red-300 bg-red-950/10 border border-red-500/30 rounded-xl">
+            <p className="text-lg font-semibold mb-2">Unable to load vehicles</p>
+            <p className="text-gray-300 mb-4">{error}</p>
+            <button onClick={loadVehicles} className="text-gold hover:text-white transition-colors">Retry</button>
           </div>
         ) : vehicles.length === 0 ? (
           <div className="p-12 text-center">

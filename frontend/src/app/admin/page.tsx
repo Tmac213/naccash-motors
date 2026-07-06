@@ -1,27 +1,36 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { CarFront, TrendingUp, Star, Eye, ArrowRight, Plus } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
       try {
         const data = await fetchApi('/inventory/admin');
         setVehicles(data);
-      } catch (err) {
+      } catch (err: any) {
+        if (err?.status === 401 || err?.status === 403) {
+          router.push('/admin/login');
+          return;
+        }
+        const message = err?.message || 'Failed to load vehicles.';
         console.error('Failed to load vehicles:', err);
+        setError(message);
       } finally {
         setLoading(false);
       }
     }
     loadData();
-  }, []);
+  }, [router]);
 
   const available = vehicles.filter(v => v.status === 'Available').length;
   const reserved = vehicles.filter(v => v.status === 'Reserved').length;
@@ -84,6 +93,13 @@ export default function AdminDashboardPage() {
         <div className="bg-gradient-to-r from-gold/20 to-transparent border border-gold/30 rounded-xl p-6 mb-10">
           <p className="text-gray-400 text-sm uppercase tracking-wider mb-1">Total Portfolio Value</p>
           <p className="text-4xl font-bold text-white">${totalValue.toLocaleString()}</p>
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="bg-red-900/30 border border-red-500/50 text-red-300 rounded-xl p-5 mb-10">
+          <p className="font-semibold">Unable to load vehicles</p>
+          <p>{error}</p>
         </div>
       )}
 
