@@ -143,13 +143,33 @@ export default function AdminVehiclesPage() {
   // Handle direct edit from URL parameter
   useEffect(() => {
     const editId = searchParams.get('edit');
-    if (editId && vehicles.length > 0) {
+    if (editId && vehicles.length > 0 && !showForm) {
       const vehicle = vehicles.find(v => v.id === parseInt(editId));
       if (vehicle) {
-        openEditForm(vehicle);
+        setEditingId(vehicle.id);
+        setForm({
+          vin: vehicle.vin || '', brand: vehicle.brand || '', model: vehicle.model || '', trim: vehicle.trim || '', year: String(vehicle.year || ''),
+          price: vehicle.price || '', status: vehicle.status || 'Available', condition: vehicle.condition || 'Used',
+          mileage: vehicle.mileage || '', description: vehicle.description || '', image: vehicle.image || '',
+          images: vehicle.images ? JSON.parse(vehicle.images) : [],
+          videos: vehicle.videos ? JSON.parse(vehicle.videos) : [],
+          transmission: vehicle.transmission || '', fuelType: vehicle.fuelType || '',
+          engineCapacity: vehicle.engineCapacity || '', drivetrain: vehicle.drivetrain || '',
+          exteriorColor: vehicle.exteriorColor || '', interiorColor: vehicle.interiorColor || '',
+          bodyType: vehicle.bodyType || '', numberOfOwners: vehicle.numberOfOwners || '',
+          keys: vehicle.keys || '', regionalSpecs: vehicle.regionalSpecs || '',
+          sunroof: vehicle.sunroof || '', lighting: vehicle.lighting || '',
+          specialPackages: vehicle.specialPackages ? JSON.parse(vehicle.specialPackages) : [],
+          techFeatures: vehicle.techFeatures ? JSON.parse(vehicle.techFeatures) : [],
+          purchaseCost: vehicle.purchaseCost || '', shippingCost: vehicle.shippingCost || '',
+          customsCost: vehicle.customsCost || '', maintenanceCost: vehicle.maintenanceCost || '',
+          otherCosts: vehicle.otherCosts || '', soldPrice: vehicle.soldPrice || '',
+        });
+        setFormError(null);
+        setShowForm(true);
       }
     }
-  }, [searchParams, vehicles]);
+  }, [searchParams, vehicles, showForm]);
 
   useEffect(() => {
     async function loadTrims() {
