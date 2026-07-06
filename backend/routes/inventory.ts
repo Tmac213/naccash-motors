@@ -5,6 +5,22 @@ import { authenticateToken } from '../middleware/authMiddleware';
 const router = Router();
 const prisma = new PrismaClient();
 
+// Helper: parse JSON string fields into proper arrays before sending to client
+function parseVehicle(v: any) {
+  const tryParse = (val: any) => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    try { return JSON.parse(val); } catch { return []; }
+  };
+  return {
+    ...v,
+    images: tryParse(v.images),
+    videos: tryParse(v.videos),
+    specialPackages: tryParse(v.specialPackages),
+    techFeatures: tryParse(v.techFeatures),
+  };
+}
+
 // Get all vehicles (Public, for showroom)
 router.get('/', async (req: Request, res: Response) => {
   try {
@@ -20,7 +36,7 @@ router.get('/', async (req: Request, res: Response) => {
     // CRITICAL SECURITY: Strip private financial fields before returning public data
     const publicVehicles = vehicles.map(v => {
       const { purchaseCost, shippingCost, customsCost, maintenanceCost, otherCosts, soldPrice, ...safeData } = v;
-      return safeData;
+      return parseVehicle(safeData);
     });
 
     res.json(publicVehicles);
@@ -36,7 +52,7 @@ router.get('/admin', authenticateToken, async (req: Request, res: Response) => {
     const vehicles = await prisma.vehicle.findMany({
       orderBy: { createdAt: 'desc' }
     });
-    res.json(vehicles);
+    res.json(vehicles.map(parseVehicle));
   } catch (error) {
     console.error('Error fetching admin vehicles:', error);
     res.status(500).json({ error: 'Failed to fetch vehicles' });
@@ -59,7 +75,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     // CRITICAL SECURITY: Strip private financial fields
     const { purchaseCost, shippingCost, customsCost, maintenanceCost, otherCosts, soldPrice, ...safeData } = vehicle;
 
-    res.json(safeData);
+    res.json(parseVehicle(safeData));
   } catch (error) {
     console.error('Error fetching vehicle:', error);
     res.status(500).json({ error: 'Failed to fetch vehicle' });
@@ -128,12 +144,18 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
     if (updateData.otherCosts !== undefined) updateData.otherCosts = updateData.otherCosts ? parseFloat(updateData.otherCosts) : null;
     if (updateData.soldPrice !== undefined) updateData.soldPrice = updateData.soldPrice ? parseFloat(updateData.soldPrice) : null;
 
+    // Serialize array fields back to JSON strings for DB storage
+    if (updateData.images !== undefined) updateData.images = Array.isArray(updateData.images) ? JSON.stringify(updateData.images) : (updateData.images || null);
+    if (updateData.videos !== undefined) updateData.videos = Array.isArray(updateData.videos) ? JSON.stringify(updateData.videos) : (updateData.videos || null);
+    if (updateData.specialPackages !== undefined) updateData.specialPackages = Array.isArray(updateData.specialPackages) ? JSON.stringify(updateData.specialPackages) : (updateData.specialPackages || null);
+    if (updateData.techFeatures !== undefined) updateData.techFeatures = Array.isArray(updateData.techFeatures) ? JSON.stringify(updateData.techFeatures) : (updateData.techFeatures || null);
+
     const updatedVehicle = await prisma.vehicle.update({
       where: { id: parseInt(id as string, 10) },
       data: updateData
     });
 
-    res.json(updatedVehicle);
+    res.json(parseVehicle(updatedVehicle));
   } catch (error) {
     console.error('Error updating vehicle:', error);
     res.status(500).json({ error: 'Failed to update vehicle' });
