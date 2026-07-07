@@ -239,7 +239,7 @@ export default function AdminVehiclesPage() {
     const formData = new FormData();
     Array.from(files).forEach(f => formData.append('media', f));
     const token = localStorage.getItem('token');
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://naccashmotors-api.onrender.com/api';
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://cloafnxpreotjbxfbohb.supabase.co/functions/v1';
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${API_URL}/upload`);
@@ -271,13 +271,18 @@ export default function AdminVehiclesPage() {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const data = JSON.parse(xhr.responseText);
+          console.log('Upload response:', data);
           const uploaded: { url: string; type: string }[] = data.files || [];
           const newImages = uploaded.filter(f => f.type === 'image').map(f => f.url);
           const newVideos = uploaded.filter(f => f.type === 'video').map(f => f.url);
+          console.log('New images:', newImages);
+          console.log('New videos:', newVideos);
 
           setForm(prev => {
             const updatedImages = [...prev.images, ...newImages];
             const updatedVideos = [...prev.videos, ...newVideos];
+            console.log('Updated form images:', updatedImages);
+            console.log('Updated form videos:', updatedVideos);
             return {
               ...prev,
               image: prev.image || updatedImages[0] || prev.image,
