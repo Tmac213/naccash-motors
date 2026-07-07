@@ -82,3 +82,5 @@ CREATE POLICY "Admin can view all vehicles" ON vehicles FOR SELECT USING (auth.r
 CREATE POLICY "Admin can insert vehicles" ON vehicles FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "Admin can update vehicles" ON vehicles FOR UPDATE USING (auth.role() = 'authenticated');
 CREATE POLICY "Admin can delete vehicles" ON vehicles FOR DELETE USING (auth.role() = 'authenticated');
+
+-- Note: Sample data is in sample-data.sql to avoid policy conflicts
