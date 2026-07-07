@@ -384,6 +384,7 @@ deno_version = 2
 
 [edge_runtime.secrets]
 JWT_SECRET = "p4l2IQdbq7ZAq5oGyicEzpz2JCXEOpj9"
+SERVICE_ROLE_KEY = "your_service_role_key"
 
 [analytics]
 enabled = true
