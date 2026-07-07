@@ -445,3 +445,21 @@ entrypoint = "./functions/auth/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/auth/*.html" ]
+
+[functions.nhtsa]
+enabled = true
+verify_jwt = false
+import_map = "./functions/nhtsa/deno.json"
+entrypoint = "./functions/nhtsa/index.ts"
+
+[functions.settings]
+enabled = true
+verify_jwt = false
+import_map = "./functions/settings/deno.json"
+entrypoint = "./functions/settings/index.ts"
+
+[functions.contact]
+enabled = true
+verify_jwt = false
+import_map = "./functions/contact/deno.json"
+entrypoint = "./functions/contact/index.ts"
