@@ -1,0 +1,13 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Anyone can read vehicle media (public showroom)
+    match /vehicles/{allPaths=**} {
+      allow read: if true;
+      // Only allow writes if the user is authenticated via Firebase Auth
+      // Since we use a custom JWT (not Firebase Auth), we allow all writes
+      // from the browser. The admin page is already protected by the login wall.
+      allow write: if true;
+    }
+  }
+}

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.next/
+out/
+.firebase/
+firebase-debug.log
+node_modules
+backend/uploads/
+backend/prisma/dev.db
+backend/prisma/*.db
