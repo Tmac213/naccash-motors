@@ -305,15 +305,20 @@ function InventoryList() {
   }, []);
 
   const filtered = vehicles.filter((car: any) => {
+    // URL params take precedence over page filters
+    const effectiveBrand = urlBrand || brandFilter;
+    const effectiveModel = urlModel;
+    
     const q = search.toLowerCase();
-    const matchesSearch = car.brand?.toLowerCase().includes(q) ||
+    const matchesSearch = q === '' || 
+                          car.brand?.toLowerCase().includes(q) ||
                           car.model?.toLowerCase().includes(q) ||
                           String(car.year).includes(q);
     const matchesStatus = statusFilter === '' || car.status === statusFilter;
-    const matchesBrand = brandFilter === '' || car.brand === brandFilter;
-    const matchesUrlBrand = urlBrand === '' || car.brand === urlBrand;
-    const matchesUrlModel = urlModel === '' || car.model === urlModel;
-    return matchesSearch && matchesStatus && matchesBrand && matchesUrlBrand && matchesUrlModel;
+    const matchesBrand = effectiveBrand === '' || car.brand === effectiveBrand;
+    const matchesModel = effectiveModel === '' || car.model === effectiveModel;
+    
+    return matchesSearch && matchesStatus && matchesBrand && matchesModel;
   });
 
   // Latest arrivals (vehicles added within last 3 days)
@@ -324,8 +329,10 @@ function InventoryList() {
     const threeDaysAgo = new Date();
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
     const isRecent = createdAt >= threeDaysAgo && car.status === 'Available';
-    const matchesUrlBrand = urlBrand === '' || car.brand === urlBrand;
-    const matchesUrlModel = urlModel === '' || car.model === urlModel;
+    const effectiveBrand = urlBrand || brandFilter;
+    const effectiveModel = urlModel;
+    const matchesUrlBrand = effectiveBrand === '' || car.brand === effectiveBrand;
+    const matchesUrlModel = effectiveModel === '' || car.model === effectiveModel;
     return isRecent && matchesUrlBrand && matchesUrlModel;
   });
 
@@ -462,13 +469,16 @@ function InventoryList() {
           <div className="w-20 h-20 mx-auto mb-4 opacity-20 flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21 8-2 2-1.5-3.7A2 2 0 0 0 15.64 5H8.4a2 2 0 0 0-1.9 1.3L5 10 3 8"/><path d="M1 11.5 3 10l-1.5-1.5"/><path d="m23 11.5-2-1.5 1.5-1.5"/><path d="M5.5 10h13l1.5 3.5V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3.5L5.5 10z"/><circle cx="7.5" cy="14.5" r="1.5"/><circle cx="16.5" cy="14.5" r="1.5"/></svg>
           </div>
-          <h3 className="text-2xl font-bold text-white mb-2">No car found</h3>
+          <h3 className="text-2xl font-bold text-white mb-2">
+            {(urlBrand || brandFilter) ? `No ${urlBrand || brandFilter} cars available` : 'No car found'}
+          </h3>
           <p className="text-gray-400 mb-6">Try adjusting your search filters or browse all vehicles</p>
           <button
             onClick={() => {
               setSearch('');
               setStatusFilter('');
               setBrandFilter('');
+              router.push('/inventory');
             }}
             className="bg-gold text-black font-semibold px-6 py-3 rounded hover:bg-gold-hover transition-colors"
           >
