@@ -113,7 +113,7 @@ export default function Home() {
             <h2 className="text-3xl font-bold uppercase tracking-wider mb-2">Latest Arrivals</h2>
             <div className="w-20 h-1 bg-gold"></div>
           </div>
-          <Link href="/inventory" className="text-gold hover:text-white transition-colors uppercase tracking-widest text-sm font-semibold flex items-center gap-1">
+          <Link href="/latest-arrivals" className="text-gold hover:text-white transition-colors uppercase tracking-widest text-sm font-semibold flex items-center gap-1">
             View All <ArrowRight className="w-4 h-4" />
           </Link>
         </div>

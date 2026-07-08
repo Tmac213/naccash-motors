@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Filter, Search, ChevronLeft, ChevronRight, MessageCircle, Settings, Gauge, Calendar, ShieldCheck, Fuel, Cog, Disc3, Palette, User, Key, Globe, Sun, Lightbulb, Package, Cpu } from 'lucide-react';
 import Link from 'next/link';
 import { fetchApi } from '@/lib/api';
+import { BRANDS } from '@/lib/car-data';
 
 /* ─────────────────────────────────────────────
    CAR DETAIL VIEW
@@ -277,11 +278,17 @@ function CarDetail({ id }: { id: string }) {
 ───────────────────────────────────────────── */
 function InventoryList() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showFilter, setShowFilter] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
+  const [brandFilter, setBrandFilter] = useState('');
+
+  // Get brand and model from URL params
+  const urlBrand = searchParams.get('brand') || '';
+  const urlModel = searchParams.get('model') || '';
 
   useEffect(() => {
     async function loadVehicles() {
@@ -303,8 +310,29 @@ function InventoryList() {
                           car.model?.toLowerCase().includes(q) ||
                           String(car.year).includes(q);
     const matchesStatus = statusFilter === '' || car.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesBrand = brandFilter === '' || car.brand === brandFilter;
+    const matchesUrlBrand = urlBrand === '' || car.brand === urlBrand;
+    const matchesUrlModel = urlModel === '' || car.model === urlModel;
+    return matchesSearch && matchesStatus && matchesBrand && matchesUrlBrand && matchesUrlModel;
   });
+
+  // Latest arrivals (vehicles added within last 3 days)
+  // If brand/model are selected, show only the latest arrival for that brand/model
+  const latestArrivals = vehicles.filter((car: any) => {
+    if (!car.createdAt) return false;
+    const createdAt = new Date(car.createdAt);
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    const isRecent = createdAt >= threeDaysAgo && car.status === 'Available';
+    const matchesUrlBrand = urlBrand === '' || car.brand === urlBrand;
+    const matchesUrlModel = urlModel === '' || car.model === urlModel;
+    return isRecent && matchesUrlBrand && matchesUrlModel;
+  });
+
+  // If brand/model are selected, show only the single latest arrival
+  const filteredLatestArrivals = (urlBrand || urlModel) 
+    ? [latestArrivals.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]].filter(Boolean)
+    : latestArrivals;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -321,18 +349,35 @@ function InventoryList() {
               <Filter className="w-4 h-4" /> Filter
             </button>
             {showFilter && (
-              <div className="absolute mt-14 z-20 bg-dark-card border border-white/20 p-4 rounded-lg shadow-xl w-48">
-                <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Status</label>
-                <select 
-                  value={statusFilter} 
-                  onChange={e => setStatusFilter(e.target.value)}
-                  className="w-full bg-dark-bg border border-white/20 text-white rounded px-3 py-2 focus:outline-none focus:border-gold"
-                >
-                  <option value="">All</option>
-                  <option value="Available">Available</option>
-                  <option value="Reserved">Reserved</option>
-                  <option value="Coming Soon">Coming Soon</option>
-                </select>
+              <div className="absolute mt-14 z-20 bg-dark-card border border-white/20 p-4 rounded-lg shadow-xl w-64">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Brand</label>
+                    <select 
+                      value={brandFilter} 
+                      onChange={e => setBrandFilter(e.target.value)}
+                      className="w-full bg-dark-bg border border-white/20 text-white rounded px-3 py-2 focus:outline-none focus:border-gold"
+                    >
+                      <option value="">All Brands</option>
+                      {BRANDS.map(brand => (
+                        <option key={brand} value={brand}>{brand}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-gray-400 mb-2">Status</label>
+                    <select 
+                      value={statusFilter} 
+                      onChange={e => setStatusFilter(e.target.value)}
+                      className="w-full bg-dark-bg border border-white/20 text-white rounded px-3 py-2 focus:outline-none focus:border-gold"
+                    >
+                      <option value="">All Statuses</option>
+                      <option value="Available">Available</option>
+                      <option value="Reserved">Reserved</option>
+                      <option value="Coming Soon">Coming Soon</option>
+                    </select>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -347,6 +392,65 @@ function InventoryList() {
             <Search className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
           </div>
         </div>
+      </div>
+
+      {/* Latest Arrivals Section */}
+      {filteredLatestArrivals.length > 0 && (
+        <div className="mb-12">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-2 h-8 bg-gold"></div>
+            <h2 className="text-2xl font-bold text-white uppercase tracking-wider">
+              {urlBrand || urlModel ? 'Latest Arrival' : 'Latest Arrivals'}
+            </h2>
+            <span className="text-xs text-gray-500 uppercase tracking-wider">
+              {urlBrand || urlModel ? `For ${urlBrand} ${urlModel}` : 'Added within last 3 days'}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {filteredLatestArrivals.map((car: any) => (
+              <div key={car.id} className="group bg-dark-card border border-gold/30 overflow-hidden hover:border-gold transition-colors flex flex-col relative">
+                <div className="absolute top-3 right-3 z-10 bg-gold text-black text-xs font-bold uppercase px-3 py-1 rounded-sm shadow-lg animate-pulse">
+                  New
+                </div>
+                <div className="relative h-48 overflow-hidden">
+                  {car.image ? (
+                    <img
+                      src={car.image}
+                      alt={`${car.year} ${car.brand} ${car.model}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-white/5 text-gray-500">
+                      <div className="w-12 h-12 mb-2 opacity-20 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21 8-2 2-1.5-3.7A2 2 0 0 0 15.64 5H8.4a2 2 0 0 0-1.9 1.3L5 10 3 8"/><path d="M1 11.5 3 10l-1.5-1.5"/><path d="m23 11.5-2-1.5 1.5-1.5"/><path d="M5.5 10h13l1.5 3.5V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3.5L5.5 10z"/><circle cx="7.5" cy="14.5" r="1.5"/><circle cx="16.5" cy="14.5" r="1.5"/></svg>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="p-4 flex-1 flex flex-col">
+                  <h3 className="text-lg font-bold text-white mb-1">
+                    {car.brand} <span className="text-gray-400 font-normal">{car.model}</span>
+                  </h3>
+                  <div className="mt-auto flex justify-between items-center pt-3 border-t border-white/10">
+                    <span className="text-lg font-bold text-gold">{car.price ? `$${car.price.toLocaleString()}` : 'POA'}</span>
+                    <button
+                      onClick={() => router.push(`/inventory?id=${car.id}`)}
+                      className="text-white uppercase tracking-wider text-xs font-bold hover:text-gold transition-colors"
+                    >
+                      View Details
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* All Vehicles Section */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-2 h-8 bg-white/30"></div>
+        <h2 className="text-2xl font-bold text-white uppercase tracking-wider">All Vehicles</h2>
       </div>
 
       {loading ? (
