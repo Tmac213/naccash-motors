@@ -115,6 +115,8 @@ export default function AdminVehiclesPage() {
   const [decodingVin, setDecodingVin] = useState(false);
   const [nhtsaTrims, setNhtsaTrims] = useState<string[]>([]);
   const [loadingTrims, setLoadingTrims] = useState(false);
+  const [sortField, setSortField] = useState<'brand' | 'year' | 'price' | 'status' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const mediaInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -123,6 +125,39 @@ export default function AdminVehiclesPage() {
   const models = form.brand ? getModels(form.brand) : [];
   const years = form.brand ? getYears(form.brand).map(String) : Array.from({ length: 2026 - 1990 + 1 }, (_, i) => String(2026 - i));
   const packages = form.brand ? getSpecialPackages(form.brand) : [];
+
+  // Sorting function
+  const sortedVehicles = [...vehicles].sort((a, b) => {
+    if (!sortField) return 0;
+    
+    let aVal = a[sortField];
+    let bVal = b[sortField];
+    
+    // Handle numeric fields
+    if (sortField === 'year' || sortField === 'price') {
+      aVal = Number(aVal) || 0;
+      bVal = Number(bVal) || 0;
+    }
+    
+    // Handle string comparison
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      aVal = aVal.toLowerCase();
+      bVal = bVal.toLowerCase();
+    }
+    
+    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const handleSort = (field: 'brand' | 'year' | 'price' | 'status') => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
 
   async function loadVehicles() {
     try {
@@ -437,13 +472,36 @@ export default function AdminVehiclesPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-white/10">
-                {['Vehicle', 'Year', 'Price', 'Fuel', 'Status', ''].map(h => (
-                  <th key={h} className={`text-left text-xs uppercase tracking-wider text-gray-500 px-5 py-4 ${h === 'Year' || h === 'Fuel' ? 'hidden lg:table-cell' : ''}`}>{h}</th>
-                ))}
+                <th 
+                  onClick={() => handleSort('brand')}
+                  className="text-left text-xs uppercase tracking-wider text-gray-500 px-5 py-4 cursor-pointer hover:text-gold transition-colors"
+                >
+                  Vehicle {sortField === 'brand' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
+                <th 
+                  onClick={() => handleSort('year')}
+                  className="text-left text-xs uppercase tracking-wider text-gray-500 px-5 py-4 cursor-pointer hover:text-gold transition-colors hidden lg:table-cell"
+                >
+                  Year {sortField === 'year' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
+                <th 
+                  onClick={() => handleSort('price')}
+                  className="text-left text-xs uppercase tracking-wider text-gray-500 px-5 py-4 cursor-pointer hover:text-gold transition-colors"
+                >
+                  Price {sortField === 'price' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
+                <th className="text-left text-xs uppercase tracking-wider text-gray-500 px-5 py-4 hidden lg:table-cell">Fuel</th>
+                <th 
+                  onClick={() => handleSort('status')}
+                  className="text-left text-xs uppercase tracking-wider text-gray-500 px-5 py-4 cursor-pointer hover:text-gold transition-colors"
+                >
+                  Status {sortField === 'status' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
+                <th className="text-left text-xs uppercase tracking-wider text-gray-500 px-5 py-4"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {vehicles.map(v => (
+              {sortedVehicles.map(v => (
                 <tr key={v.id} className="hover:bg-white/5 transition-colors group">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">

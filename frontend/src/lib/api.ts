@@ -1,4 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://rfzxzkjfimaywufxdiav.supabase.co';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || `${SUPABASE_URL}/functions/v1`;
 
 export interface ApiError extends Error {
   status?: number;
@@ -21,7 +22,10 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  // Construct API URL for Express backend
+  const url = `${API_URL}${endpoint}`;
+
+  const response = await fetch(url, {
     ...options,
     headers,
   });
