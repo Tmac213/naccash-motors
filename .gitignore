@@ -9,3 +9,5 @@ node_modules
 backend/uploads/
 backend/prisma/dev.db
 backend/prisma/*.db
+backend/supabase/.temp/
+backend/scripts/seed-admin.sql
